@@ -1,0 +1,26 @@
+{
+  "name": "moonbit-online",
+  "version": "1.0.0",
+  "description": "やりたいことはmoonbitのwasmを利用したオンラインデモの作成。",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@moonbit/moonc-worker": "^0.1.202601103",
+    "@picocss/pico": "^2.1.1",
+    "comlink": "^4.4.2",
+    "preact": "^10.28.2"
+  }
+}
