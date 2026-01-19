@@ -38,23 +38,17 @@ export function App() {
     setOutput('Compiling...');
     
     try {
-      console.log('Starting compilation...');
       const compileResult = await compiler.compile(code);
-      console.log('Compile result received:', compileResult);
       
       if (!compileResult.success) {
-        console.error('Compilation failed:', compileResult.error);
         setOutput(`Compilation Error:\n${compileResult.error}`);
         return;
       }
       
-      console.log('Compilation successful, starting execution...');
       setOutput('Running...');
       const result = await compiler.runJs(compileResult.js!);
-      console.log('Execution complete:', result);
       setOutput(`Output:\n${result || '(no output)'}`);
     } catch (error) {
-      console.error('Error in handleRun:', error);
       setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsRunning(false);

@@ -74,10 +74,11 @@ fn main {
 
 現在のバージョンには以下の制限があります：
 
-- ⚠️ **標準ライブラリ未対応**: `println`、`print`、`debug`等の標準関数は使用できません
 - 📄 **単一ファイルのみ**: 複数ファイルプロジェクトには対応していません
 - 🔤 **基本的なエディタ**: シンタックスハイライト、コード補完はありません
 - 📦 **パッケージ管理**: 外部ライブラリのインポートはできません
+
+**✅ 標準ライブラリはサポート済み**: `println`、`print`などの標準関数が使用できます
 
 ## 開発
 
@@ -101,11 +102,15 @@ moonbit-online/
 ### コンパイルフロー
 
 1. ユーザーがMoonBitコードを入力
-2. `@moonbit/moonc-worker`（Web Worker）でコンパイル
-3. `buildPackage` APIでコアファイルを生成
-4. `linkCore` APIでWASMバイナリを生成
-5. `WebAssembly.instantiate`でWASMを実行
-6. 結果を画面に表示
+2. `@moonbit/moonpad-monaco`を使用してコンパイル（JS出力）
+3. `moon.compile()` APIでJavaScriptコードを生成
+4. `moon.run()` APIで実行し、ReadableStreamで出力を取得
+5. 結果を画面に表示
+
+**技術的な詳細**:
+- JS出力方式により標準ライブラリが自動的に含まれる
+- Worker files（moonc-worker.js, lsp-server.js等）はpublic/に配置し、ルートパスから参照
+- moonbit-tourの実装を参考に、@moonbit/moonpad-monaco@0.1.202510171を使用
 
 ### URL共有の仕組み
 
@@ -126,7 +131,7 @@ const code = decodeURIComponent(atob(hash));
 
 - MoonBitの構文が正しいか確認してください
 - main関数は `fn main { ... }` の形式で記述する必要があります
-- 標準ライブラリの関数（`println`等）は現在使用できません
+- 文字列補間は `\{variable}` の形式を使用します（例: `println("x = \{x}")`）
 
 ### URLからコードが復元されない
 

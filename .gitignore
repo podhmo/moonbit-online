@@ -1,5 +1,7 @@
-node_modules
+node_modules/
 vendor/
 public/
+dist/
+
 core.tar.gz
 moonbit-wasm.tar.gz
