@@ -42,7 +42,8 @@ npm run build
 エディタ右上のセレクトボックスから以下のサンプルを選択できます：
 
 - **Hello**: シンプルな単一ファイルの例
-- **Multiple Files**: 複数ファイルを使った例
+- **Multiple Files**: 同一パッケージ内の複数ファイル
+- **With Package Import**: 標準ライブラリ（@hashmap）の使用例
 
 ### 単一ファイル
 
@@ -95,17 +96,40 @@ pub fn sum(arr : Array[Int]) -> Int {
 }
 ```
 
+### パッケージimport
+
+`@moonbitlang/core`の標準ライブラリパッケージを使用できます：
+
+```moonbit
+fn main {
+  // Using @moonbitlang/core/hashmap
+  let map = @hashmap.from_array([("a", 1), ("b", 2), ("c", 3)])
+  println("Map: \{map}")
+  
+  map.set("d", 4)
+  map.remove("a") |> ignore
+  
+  match map.get("b") {
+    Some(v) => println("Value: \{v}")
+    None => println("Not found")
+  }
+}
+```
+
 ## 制限事項
 
 現在のバージョンには以下の制限があります：
 
 - 🔤 **基本的なエディタ**: シンタックスハイライト、コード補完はありません
-- 📦 **パッケージ管理**: 外部ライブラリのインポートはできません
+- 📦 **単一パッケージ**: 複数パッケージのimportはできません（同一パッケージ内の複数ファイルは可能）
+- ⚠️ **エラーハンドリング関数**: `fn main`でResult型を返す関数（`@strconv`等）は使用不可
 
 ### サポート済み機能 ✅
 
-- ✅ **標準ライブラリ**: `println`、`print`などの標準関数が使用できます
-- ✅ **複数ファイル**: go-playground方式で複数ファイルをサポート
+- ✅ **標準ライブラリ**: `println`、配列、Option型などが使用できます
+- ✅ **複数ファイル**: go-playground方式で同一パッケージ内の複数ファイルをサポート
+- ✅ **@moonbitlang/core**: @hashmapなどの標準パッケージが使用可能
+- ✅ **URL共有**: コードをURLで共有できます
 
 
 ## コーディングエージェント向け

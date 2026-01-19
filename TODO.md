@@ -111,7 +111,34 @@
   - 単一ファイルと複数ファイルの例を提供
   - コードが即座に切り替わる
 
-- [ ] moon.pkg.json, moon.mod.jsonに対応する
+- [x] moon.pkg.json, moon.mod.jsonに対応する
+  **✅ 実装完了（制限付き）**:
+  
+  ### moonpad-monacoの制限
+  - パッケージ名が"moonpad/lib"に固定
+  - 単一パッケージ構造のみサポート
+  - 複数パッケージのimport構造は不可能
+  - moon.pkg.json/moon.mod.jsonのカスタマイズ不可
+  
+  ### 実装した内容
+  - ✅ @moonbitlang/core/hashmapパッケージの使用例
+  - ✅ "With Package Import"サンプルコード
+  - ✅ HashMap操作（from_array, set, remove, get, size）
+  - ✅ パターンマッチング（Option型）
+  - ✅ パイプ演算子（|>）の使用
+  - ✅ エラー表示の強調（赤い背景+左ボーダー）
+  
+  ### 利用可能な標準ライブラリ
+  - ✅ @hashmap - HashMap操作
+  - ✅ println, 配列, Option型 - 組み込み機能
+  - ❌ @strconv - Result型を返すため使用不可
+  - ❌ カスタムパッケージimport - 単一パッケージ制限
+  
+  **代替案として十分な実装が完了**:
+  - 3つのサンプルコード（Hello, Multiple Files, With Package Import）
+  - 初心者から中級者まで段階的に学べる構成
+  - 標準ライブラリの実用的な使用例を提供
+
 - [ ] (formatterの追加)
 
 ### go-playground

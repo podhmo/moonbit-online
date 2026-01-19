@@ -21,6 +21,28 @@ pub fn hello() -> Unit {
 
 pub fn add(a : Int, b : Int) -> Int {
   a + b
+}`,
+  'With Package Import': `fn main {
+  // Using @moonbitlang/core/hashmap package
+  let map = @hashmap.from_array([("a", 1), ("b", 2), ("c", 3)])
+  println("Initial map: \\{map}")
+  
+  // Remove an entry
+  map.remove("a") |> ignore
+  println("After removing 'a': \\{map}")
+  
+  // Add new entries
+  map.set("d", 4)
+  map.set("e", 5)
+  println("After adding 'd' and 'e': \\{map}")
+  
+  // Get a value
+  match map.get("b") {
+    Some(v) => println("Value of 'b': \\{v}")
+    None => println("Key 'b' not found")
+  }
+  
+  println("Map size: \\{map.size()}")
 }`
 };
 
@@ -73,6 +95,7 @@ export function App() {
   const [code, setCode] = useState(loadCodeFromHash());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
 
   // Load code from URL hash on mount
@@ -89,6 +112,7 @@ export function App() {
   const handleRun = async () => {
     setIsRunning(true);
     setOutput('Compiling...');
+    setIsError(false);
     
     try {
       const files = parseMultipleFiles(code);
@@ -96,6 +120,7 @@ export function App() {
       
       if (!compileResult.success) {
         setOutput(`Compilation Error:\n${compileResult.error}`);
+        setIsError(true);
         return;
       }
       
@@ -104,6 +129,7 @@ export function App() {
       setOutput(`Output:\n${result || '(no output)'}`);
     } catch (error) {
       setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      setIsError(true);
     } finally {
       setIsRunning(false);
     }
@@ -176,12 +202,14 @@ export function App() {
         <label>
           Output
           <pre style={{ 
-            background: '#1a1a1a', 
+            background: isError ? '#2d1a1a' : '#1a1a1a',
+            borderLeft: isError ? '4px solid #e74c3c' : 'none',
             padding: '1rem', 
             borderRadius: '0.25rem',
             minHeight: '150px',
             whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word'
+            wordWrap: 'break-word',
+            color: isError ? '#ff6b6b' : 'inherit'
           }}>
             {output || 'Ready to run...'}
           </pre>
