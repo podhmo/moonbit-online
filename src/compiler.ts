@@ -23,11 +23,15 @@ async function ensureMoonInit() {
 
 export class MoonbitCompiler {
   async compile(sourceCode: string): Promise<CompileResult> {
+    return this.compileMultiple([['main.mbt', sourceCode]]);
+  }
+
+  async compileMultiple(files: Array<[string, string]>): Promise<CompileResult> {
     const moon = await ensureMoonInit();
     
     try {
       const result = await moon.compile({
-        libInputs: [['main.mbt', sourceCode]],
+        libInputs: files,
         debugMain: true
       });
 

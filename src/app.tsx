@@ -3,7 +3,59 @@ import { MoonbitCompiler } from './compiler';
 
 const compiler = new MoonbitCompiler();
 
-const DEFAULT_CODE = 'fn main {\n  println("Hello, MoonBit!")\n}';
+const SAMPLE_CODES = {
+  'Hello': `fn main {
+  println("Hello, MoonBit!")
+  let x = 42
+  println("The answer is \\{x}")
+}`,
+  'Multiple Files': `fn main {
+  hello()
+  let result = add(10, 20)
+  println("10 + 20 = \\{result}")
+}
+-- lib.mbt --
+pub fn hello() -> Unit {
+  println("Hello from lib.mbt!")
+}
+
+pub fn add(a : Int, b : Int) -> Int {
+  a + b
+}`
+};
+
+const DEFAULT_CODE = SAMPLE_CODES['Hello'];
+
+function parseMultipleFiles(source: string): Array<[string, string]> {
+  const files: Array<[string, string]> = [];
+  const lines = source.split('\n');
+  
+  let currentFile = 'main.mbt';
+  let currentContent: string[] = [];
+  
+  for (const line of lines) {
+    // Check for file separator: -- filename --
+    const match = line.match(/^--\s+(.+?)\s+--$/);
+    if (match) {
+      // Save previous file
+      if (currentContent.length > 0 || files.length === 0) {
+        files.push([currentFile, currentContent.join('\n')]);
+      }
+      // Start new file
+      currentFile = match[1].trim();
+      currentContent = [];
+    } else {
+      currentContent.push(line);
+    }
+  }
+  
+  // Save last file
+  if (currentContent.length > 0 || files.length === 0) {
+    files.push([currentFile, currentContent.join('\n')]);
+  }
+  
+  return files;
+}
 
 function loadCodeFromHash(): string {
   const hash = window.location.hash.slice(1);
@@ -21,6 +73,7 @@ export function App() {
   const [code, setCode] = useState(loadCodeFromHash());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
 
   // Load code from URL hash on mount
   useEffect(() => {
@@ -38,7 +91,8 @@ export function App() {
     setOutput('Compiling...');
     
     try {
-      const compileResult = await compiler.compile(code);
+      const files = parseMultipleFiles(code);
+      const compileResult = await compiler.compileMultiple(files);
       
       if (!compileResult.success) {
         setOutput(`Compilation Error:\n${compileResult.error}`);
@@ -63,6 +117,12 @@ export function App() {
     });
   };
 
+  const handleSampleChange = (e: Event) => {
+    const value = (e.target as HTMLSelectElement).value as keyof typeof SAMPLE_CODES;
+    setSelectedSample(value);
+    setCode(SAMPLE_CODES[value]);
+  };
+
   return (
     <main class="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -79,19 +139,28 @@ export function App() {
       </header>
       
       <section>
-        <label>
-          Code Editor
-          <textarea
-            value={code}
-            onInput={(e) => setCode((e.target as HTMLTextAreaElement).value)}
-            rows={15}
-            style={{ 
-              fontFamily: 'monospace',
-              fontSize: '14px',
-              lineHeight: '1.5'
-            }}
-          />
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <label style={{ margin: 0 }}>Code Editor</label>
+          <select 
+            value={selectedSample} 
+            onChange={handleSampleChange}
+            style={{ width: 'auto', marginBottom: 0 }}
+          >
+            {Object.keys(SAMPLE_CODES).map(key => (
+              <option key={key} value={key}>{key}</option>
+            ))}
+          </select>
+        </div>
+        <textarea
+          value={code}
+          onInput={(e) => setCode((e.target as HTMLTextAreaElement).value)}
+          rows={15}
+          style={{ 
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            lineHeight: '1.5'
+          }}
+        />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
           <button onClick={handleRun} disabled={isRunning}>
