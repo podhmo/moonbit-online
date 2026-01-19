@@ -1,8 +1,168 @@
-( moonpad-monacoの解析結果 )
+# MoonBit Online - プロジェクト情報
 
-# DeepWiki Q&A with Code Context for Repository: moonbitlang/moonpad-monaco
-## Q1
-monacoを外してmoonc-worker.jsを直接使う方法が知りたいです。wasmのmoonbitを直接利用して実行したいです。
+## プロジェクト概要
+
+MoonBitのWASMコンパイラを利用したブラウザ上で動作するオンラインプレイグラウンド。
+完全にブラウザベースで、サーバーサイド不要でMoonBitコードのコンパイル・実行が可能。
+
+## 技術スタック
+
+### フロントエンド
+- **Preact**: 軽量なReact代替ライブラリ
+- **TypeScript**: 型安全な開発
+- **Vite**: 高速ビルドツール
+- **Pico.css v2**: ミニマルCSSフレームワーク（ダークモード対応）
+
+### コンパイラ・実行環境
+- **@moonbit/moonpad-monaco@0.1.202510171**: MoonBitコンパイラのラッパー
+- **@moonbit/moonc-worker**: MoonBit WASMコンパイラ
+- **monaco-editor-core@0.52.0**: エディタコア（将来の拡張用）
+
+### 実行方式
+- **JS出力方式**: WASMではなくJavaScriptコードを生成・実行
+- **標準ライブラリ自動バンドル**: JS出力により標準ライブラリが自動的に含まれる
+- **Worker配置**: moonc-worker.js、lsp-server.js、onig.wasmをpublic/に配置
+
+## アーキテクチャ
+
+### コンパイル・実行フロー
+
+1. ユーザーがMoonBitコードを入力（textarea）
+2. `moon.compile()` でJavaScriptコードを生成（debugMain: true）
+3. 標準ライブラリが自動的にバンドルされる
+4. `moon.run()` でJSコードを実行
+5. ReadableStream<string>から出力を取得
+6. 画面に表示
+
+### Worker初期化
+
+```typescript
+moonbitMode.init({
+  onigWasmUrl: '/onig.wasm',
+  lspWorker: new Worker('/lsp-server.js'),
+  mooncWorkerFactory: () => new Worker('/moonc-worker.js')
+})
+```
+
+### ビルドプロセス
+
+1. `vite build`: Preact + TypeScriptをビルド
+2. `npm run copy-workers`: public/からdist/へworkerファイルをコピー
+3. dist/ディレクトリに全ファイルが揃う
+
+## 機能
+
+### 実装済み機能 ✅
+
+- ✅ MoonBitコードのコンパイル（JS出力）
+- ✅ コード実行と出力表示
+- ✅ println含む標準ライブラリの完全サポート
+- ✅ コンパイルエラーの表示
+- ✅ URL共有機能（Base64エンコード）
+- ✅ レスポンシブデザイン
+- ✅ ダークモード対応
+
+### 動作確認済み
+
+```moonbit
+fn main {
+  println("Hello, MoonBit!")
+  let x = 42
+  println("x = \{x}")
+  let arr = [1, 2, 3, 4, 5]
+  println("Array: \{arr}")
+}
+```
+
+## 技術的な発見
+
+### 重要なポイント
+
+1. **moonbit-tourの実装を参考にした**
+   - vendor/moonbit-docs/moonbit-tourのコードが解決の鍵
+   - Workerファイルをpublic/に配置し、ルートパスから参照
+   - JS出力方式により標準ライブラリが自動的に含まれる
+
+2. **WASMではなくJS出力**
+   - 当初はWASM出力を試みたが、標準ライブラリの統合で問題発生
+   - JS出力に切り替えることで標準ライブラリが自動的にバンドルされる
+   - .miファイルの手動管理が不要
+
+3. **パッケージバージョンの重要性**
+   - @moonbit/moonpad-monaco@0.1.202510171
+   - monaco-editor-core@0.52.0
+   - moonbit-tourと同じバージョンに統一することで動作
+
+## 制限事項
+
+- 📄 **単一ファイルのみ**: 複数ファイルプロジェクトには対応していません
+- 🔤 **基本的なエディタ**: シンタックスハイライト、コード補完はありません
+- 📦 **パッケージ管理**: 外部ライブラリのインポートはできません
+
+## 今後の拡張案
+
+- Monaco Editorの完全統合（シンタックスハイライト、補完）
+- 複数ファイルのサポート
+- コード例のプリセット
+- エクスポート機能（.mbtファイルのダウンロード）
+- 実行時間の測定
+- メモリ使用量の表示
+
+## 開発コマンド
+
+```bash
+# 開発サーバー起動
+npm run dev
+
+# プロダクションビルド（workerファイル自動コピー）
+npm run build
+
+# ビルドのプレビュー
+npm run preview
+```
+
+## ディレクトリ構造
+
+```
+moonbit-online/
+├── src/
+│   ├── app.tsx          # メインアプリケーションコンポーネント
+│   ├── compiler.ts      # MoonBit compiler wrapper (moonpad-monaco)
+│   └── main.tsx         # エントリーポイント
+├── public/              # 静的ファイル
+│   ├── lsp-server.js    # Language Server Worker (3.2MB)
+│   ├── moonc-worker.js  # MoonBit Compiler Worker (3.4MB)
+│   ├── moonpad-monaco.js # Monaco integration (8.3MB)
+│   └── onig.wasm        # Oniguruma WASM (462KB)
+├── results/             # 振り返り・スクリーンショット
+├── dist/                # ビルド出力
+├── index.html           # HTMLテンプレート
+├── vite.config.ts       # Vite設定
+├── tsconfig.json        # TypeScript設定
+├── package.json         # 依存関係とスクリプト
+├── TODO.md              # タスクリスト
+├── README.md            # ユーザー向けドキュメント
+└── info.md              # このファイル（開発者向け情報）
+```
+
+## 学習リソース
+
+- [MoonBit公式ドキュメント](https://www.moonbitlang.com/docs/)
+- [moonbit-tour実装](https://tour.moonbitlang.com/)
+- [@moonbit/moonpad-monaco NPM](https://www.npmjs.com/package/@moonbit/moonpad-monaco)
+- [Preact公式サイト](https://preactjs.com/)
+- [Vite公式サイト](https://vitejs.dev/)
+
+## 開発履歴
+
+主要な実装フェーズ：
+1. Phase 1: コンパイラ起動検証（Vite + Preact + moonc-worker）
+2. Phase 2: 実行環境構築（当初はWASM、後にJS出力に変更）
+3. Phase 3: UI構築とURL共有機能
+4. 標準ライブラリ統合: moonbit-tour方式の採用により成功
+
+詳細は`results/`ディレクトリの振り返りドキュメントを参照。
+
 ### Answer
 ## moonc-worker.jsを直接使用する方法
 

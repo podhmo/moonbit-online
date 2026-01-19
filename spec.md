@@ -106,3 +106,105 @@
 *   **WASMサイズ**: `moonc.wasm` や標準ライブラリのサイズが大きく、初期ロードに時間がかかる可能性がある（プログレスバー等のUI考慮が必要）。
 *   **Polyfillの完全性**: `moonc` が特殊なシステムコールを使用している場合、汎用的な WASI Shim では動かない可能性がある（その場合、エラーログを見ながら個別実装が必要）。
 
+
+---
+
+## 7. 実装完了報告（2026-01-20）
+
+### 実装結果
+
+当初の仕様から**大幅な方針転換**を行い、**MVP完成**しました。
+
+### 方針変更の経緯
+
+#### 当初の計画
+- `moonc.wasm`を直接使用
+- WASI Shim/Polyfillsによるファイルシステムのエミュレーション
+- WASM出力による実行
+
+#### 実際の実装
+- **@moonbit/moonpad-monaco**を使用（公式のラッパーライブラリ）
+- **JS出力方式**に変更（WASM出力ではなく）
+- Workerファイル（moonc-worker.js, lsp-server.js, onig.wasm）をpublic/に配置
+
+### 主要な技術的発見
+
+1. **moonbit-tourの参考実装**
+   - vendor/moonbit-docs/moonbit-tourのコードが解決の鍵
+   - moonbit-tourと同じ実装方式を採用することで成功
+
+2. **JS出力方式の利点**
+   - 標準ライブラリが自動的にバンドルされる
+   - .miファイルの手動管理が不要
+   - println等の標準関数が即座に使用可能
+
+3. **パッケージバージョンの重要性**
+   - @moonbit/moonpad-monaco@0.1.202510171
+   - monaco-editor-core@0.52.0
+   - バージョンを合わせることが動作の鍵
+
+### 実装された機能
+
+✅ **Phase 1完了**: コンパイラ起動検証
+- Vite + Preact + TypeScript環境構築
+- @moonbit/moonpad-monacoの統合
+- 基本的なコンパイル動作確認
+
+✅ **Phase 2完了**: ランタイム接続（方式変更）
+- JS出力による実行（当初のWASM実行から変更）
+- moon.run()によるReadableStreamからの出力取得
+- 標準ライブラリの完全サポート
+
+✅ **Phase 3完了**: UI構築 & 統合
+- Preact + Pico.cssによる直感的なUI
+- コードエディタ（textarea）
+- 実行ボタンとエラー表示
+- URL共有機能（Base64エンコード）
+- ダークモード対応
+- レスポンシブデザイン
+
+### 当初の懸念点の解決状況
+
+#### WASMサイズの懸念
+→ **解決**: JS出力方式により、実行時のWASMサイズは問題にならない
+→ Workerファイル（合計約15MB）は初回ロード時のみ
+
+#### Polyfillの完全性の懸念
+→ **回避**: @moonbit/moonpad-monacoを使用することで、低レベルのPolyfill実装が不要に
+
+### 制限事項
+
+実装されなかった機能：
+- 複数ファイルプロジェクトのサポート
+- Monaco Editorの完全統合（シンタックスハイライト）
+- パッケージ管理
+
+これらは将来の拡張として残されています。
+
+### ビルドプロセスの自動化
+
+```json
+"scripts": {
+  "dev": "vite",
+  "build": "vite build && npm run copy-workers",
+  "copy-workers": "cp public/*.js public/*.wasm dist/",
+  "preview": "vite preview"
+}
+```
+
+ビルド時にWorkerファイルが自動的にdist/にコピーされます。
+
+### 成果物
+
+- 動作するWebアプリケーション
+- 完全なドキュメント（README.md, info.md, TODO.md）
+- 振り返りドキュメント（results/ディレクトリ）
+- スクリーンショット
+
+### 結論
+
+当初の低レベル実装（WASI Shim + moonc.wasm直接利用）から、
+公式ライブラリ（@moonbit/moonpad-monaco）を活用する高レベル実装に方針転換したことで、
+**開発期間を大幅に短縮**し、**保守性の高い実装**を実現できました。
+
+moonbit-tourの実装を参考にしたことが成功の鍵でした。
