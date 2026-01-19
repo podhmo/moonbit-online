@@ -52,10 +52,6 @@ export class MoonbitCompiler {
         stopOnMain: false
       });
 
-      console.log('Link result type:', typeof linkResult.result);
-      console.log('Link result length:', linkResult.result?.length);
-      console.log('Link result first bytes:', linkResult.result?.slice(0, 20));
-
       return {
         success: true,
         wasmBytes: linkResult.result
