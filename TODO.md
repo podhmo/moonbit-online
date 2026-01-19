@@ -84,3 +84,35 @@
   - [x] 使い方
   - [x] 技術スタック
   - [x] 開発手順
+
+## 追加機能
+
+- [ ] go-playgroundのように複数ファイルを扱うことを可能にする。
+- [ ] moon.pkg.json, moon.mod.jsonに対応する
+- [ ] (formatterの追加)
+
+### go-playground
+
+以下のような形で複数ファイルを使うことができる。
+
+```
+package main
+
+import (
+	"play.ground/foo"
+)
+
+func main() {
+	foo.Bar()
+}
+-- go.mod --
+module play.ground
+-- foo/foo.go --
+package foo
+
+import "fmt"
+
+func Bar() {
+	fmt.Println("This function lives in an another file!")
+}
+```
