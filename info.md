@@ -21,7 +21,7 @@ MoonBitのWASMコンパイラを利用したブラウザ上で動作するオン
 ### 実行方式
 - **JS出力方式**: WASMではなくJavaScriptコードを生成・実行
 - **標準ライブラリ自動バンドル**: JS出力により標準ライブラリが自動的に含まれる
-- **Worker配置**: moonc-worker.js、lsp-server.js、onig.wasmをpublic/に配置
+- **Worker配置**: moonc-worker.js、onig.wasmをpublic/に配置
 
 ## アーキテクチャ
 
@@ -39,7 +39,7 @@ MoonBitのWASMコンパイラを利用したブラウザ上で動作するオン
 ```typescript
 moonbitMode.init({
   onigWasmUrl: '/onig.wasm',
-  lspWorker: new Worker('/lsp-server.js'),
+
   mooncWorkerFactory: () => new Worker('/moonc-worker.js')
 })
 ```
@@ -130,7 +130,7 @@ moonbit-online/
 │   ├── compiler.ts      # MoonBit compiler wrapper (moonpad-monaco)
 │   └── main.tsx         # エントリーポイント
 ├── public/              # 静的ファイル
-│   ├── lsp-server.js    # Language Server Worker (3.2MB)
+
 │   ├── moonc-worker.js  # MoonBit Compiler Worker (3.4MB)
 │   ├── moonpad-monaco.js # Monaco integration (8.3MB)
 │   └── onig.wasm        # Oniguruma WASM (462KB)

@@ -170,7 +170,7 @@ moonbit-online/
 
 **技術的な詳細**:
 - JS出力方式により標準ライブラリが自動的に含まれる
-- Worker files（moonc-worker.js, lsp-server.js等）はpublic/に配置し、ルートパスから参照
+- Worker files（moonc-worker.js等）はpublic/に配置し、ルートパスから参照
 - moonbit-tourの実装を参考に、@moonbit/moonpad-monaco@0.1.202510171を使用
 
 ### URL共有の仕組み

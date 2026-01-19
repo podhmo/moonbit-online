@@ -13,7 +13,6 @@ async function ensureMoonInit() {
   if (!moonInitialized) {
     moonInstance = moonbitMode.init({
       onigWasmUrl: '/onig.wasm',
-      lspWorker: new Worker('/lsp-server.js'),
       mooncWorkerFactory: () => new Worker('/moonc-worker.js')
     });
     moonInitialized = true;

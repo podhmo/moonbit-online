@@ -125,7 +125,7 @@
 #### 実際の実装
 - **@moonbit/moonpad-monaco**を使用（公式のラッパーライブラリ）
 - **JS出力方式**に変更（WASM出力ではなく）
-- Workerファイル（moonc-worker.js, lsp-server.js, onig.wasm）をpublic/に配置
+- Workerファイル（moonc-worker.js, onig.wasm）をpublic/に配置
 
 ### 主要な技術的発見
 
