@@ -4,44 +4,15 @@ MoonBitのWASMコンパイラを利用したブラウザ上で動作するオン
 
 ![Screenshot](results/screenshot-phase3.png)
 
-## 特徴
-
-- 🌐 **完全ブラウザベース**: サーバーサイド不要、全ての処理がブラウザ内で完結
-- ⚡ **高速コンパイル**: WASM版のMoonBitコンパイラを使用
-- 🔗 **URL共有**: コードをURLエンコードして簡単に共有
-- 🎨 **ダークモード**: 目に優しいダークテーマ
-- 📱 **レスポンシブ**: モバイル・デスクトップ対応
-
-## デモ
-
-[Live Demo](https://podhmo.github.io/moonbit-online/) （デプロイ後）
-
-## 技術スタック
-
-- **Frontend**: [Preact](https://preactjs.com/) + TypeScript
-- **Build Tool**: [Vite](https://vitejs.dev/)
-- **Styling**: [Pico.css v2](https://picocss.com/)
-- **Compiler**: [@moonbit/moonc-worker](https://www.npmjs.com/package/@moonbit/moonc-worker)
-- **Worker Communication**: [Comlink](https://github.com/GoogleChromeLabs/comlink)
-
 ## セットアップ
-
-### 前提条件
-
-- Node.js 18+
-- npm または yarn
 
 ### インストール
 
 ```bash
-# リポジトリのクローン
 git clone https://github.com/podhmo/moonbit-online.git
 cd moonbit-online
 
-# 依存関係のインストール
 npm install
-
-# 開発サーバーの起動
 npm run dev
 ```
 
@@ -55,30 +26,25 @@ npm run build
 
 ビルド成果物は `dist/` ディレクトリに生成されます。
 
-## 使い方
-
-1. **コードを書く**: エディタにMoonBitコードを入力
-2. **実行**: 「Run」ボタンをクリックしてコンパイル・実行
-3. **共有**: 「Share」ボタンでコードをURLエンコードしてクリップボードにコピー
-
-### サンプルコード
-
-```moonbit
-fn main {
-  let x = 42
-  let y = x * 2
-}
-```
-
 ## 制限事項
 
 現在のバージョンには以下の制限があります：
 
-- 📄 **単一ファイルのみ**: 複数ファイルプロジェクトには対応していません
-- 🔤 **基本的なエディタ**: シンタックスハイライト、コード補完はありません
-- 📦 **パッケージ管理**: 外部ライブラリのインポートはできません
+- 📄 単一ファイルのみ: 複数ファイルプロジェクトには対応していません
+- 🔤 基本的なエディタ: シンタックスハイライト、コード補完はありません
+- 📦 パッケージ管理: 外部ライブラリのインポートはできません
 
-**✅ 標準ライブラリはサポート済み**: `println`、`print`などの標準関数が使用できます
+✅ 標準ライブラリはサポート済み: `println`、`print`などの標準関数が使用できます
+
+
+## コーディングエージェント向け
+
+### 振り返り
+
+実際の作業の際には ./TODO.md を読み一つずつ作業を進めてください。そして完了した場合はチェックボックスをonにしてください。
+必ず作業の最後にテストを実行して全てのテストが通ることを確認してください。
+成功しても失敗しても常に「振り返り」をresults/`%Y%m%d-%H%M.md`-(ok|ng).mdに記録してください。「振り返り」とは ./prompts.md に書かれた振り返りのプロンプ
+
 
 ## 開発
 
@@ -124,35 +90,6 @@ const url = `${origin}${pathname}#${encoded}`;
 // デコード
 const code = decodeURIComponent(atob(hash));
 ```
-
-## トラブルシューティング
-
-### コンパイルエラーが出る
-
-- MoonBitの構文が正しいか確認してください
-- main関数は `fn main { ... }` の形式で記述する必要があります
-- 文字列補間は `\{variable}` の形式を使用します（例: `println("x = \{x}")`）
-
-### URLからコードが復元されない
-
-- URLハッシュが壊れていないか確認してください
-- ブラウザのキャッシュをクリアしてみてください
-
-## ロードマップ
-
-- [ ] 標準ライブラリの統合
-- [ ] シンタックスハイライト
-- [ ] エラーメッセージの詳細表示
-- [ ] サンプルコード集
-- [ ] 複数ファイル対応
-
-## 貢献
-
-プルリクエスト、Issue報告を歓迎します！
-
-## ライセンス
-
-ISC
 
 ## 参考
 
