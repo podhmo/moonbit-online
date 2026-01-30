@@ -1,6 +1,7 @@
 # 🌙 MoonBit Online
 
 MoonBitのWASMコンパイラを利用したブラウザ上で動作するオンラインプレイグラウンド。
+demo: https://podhmo.github.io/moonbit-online/
 
 ![Screenshot](results/screenshot-multifile.png)
 
