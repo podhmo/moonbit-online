@@ -11,9 +11,10 @@ let moonInstance: ReturnType<typeof moonbitMode.init> | null = null;
 
 async function ensureMoonInit() {
   if (!moonInitialized) {
+    const base = import.meta.env.BASE_URL;
     moonInstance = moonbitMode.init({
-      onigWasmUrl: '/onig.wasm',
-      mooncWorkerFactory: () => new Worker('/moonc-worker.js')
+      onigWasmUrl: `${base}onig.wasm`,
+      mooncWorkerFactory: () => new Worker(`${base}moonc-worker.js`)
     });
     moonInitialized = true;
   }
