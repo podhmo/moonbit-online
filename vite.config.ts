@@ -7,6 +7,9 @@ export default defineConfig(({ command }) => ({
   worker: {
     format: 'es'
   },
+  build: {
+    minify: false
+  },
   optimizeDeps: {
     exclude: ['@moonbit/moonc-worker']
   }
