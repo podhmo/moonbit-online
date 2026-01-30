@@ -14,7 +14,7 @@ async function ensureMoonInit() {
     const base = import.meta.env.BASE_URL;
     moonInstance = moonbitMode.init({
       onigWasmUrl: `${base}onig.wasm`,
-      mooncWorkerFactory: () => new Worker(`${base}moonc-worker.js`)
+      mooncWorkerFactory: () => new Worker(`${base}moonc-worker.js`, { type: 'module' })
     });
     moonInitialized = true;
   }
@@ -36,7 +36,15 @@ export class MoonbitCompiler {
       });
 
       if (result.kind === 'error') {
-        const errors = (result.diagnostics || [])
+        const diagnostics = result.diagnostics;
+        if (!Array.isArray(diagnostics)) {
+          return {
+            success: false,
+            error: `Compilation failed: diagnostics is not an array (${typeof diagnostics})`
+          };
+        }
+        
+        const errors = diagnostics
           .map((d) => {
             const loc = d.loc ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
             return `${loc ? loc + ' - ' : ''}${d.message}`;
@@ -50,6 +58,12 @@ export class MoonbitCompiler {
       }
 
       if (result.kind === 'success') {
+        if (!result.js) {
+          return {
+            success: false,
+            error: 'Compilation succeeded but no JS output received'
+          };
+        }
         return {
           success: true,
           js: result.js
@@ -58,12 +72,12 @@ export class MoonbitCompiler {
 
       return {
         success: false,
-        error: 'Unknown compilation result'
+        error: `Unknown compilation result kind: ${result.kind}`
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: `Exception: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack : ''}`
       };
     }
   }
@@ -72,6 +86,10 @@ export class MoonbitCompiler {
     const moon = await ensureMoonInit();
     
     try {
+      if (!js || js.length === 0) {
+        throw new Error('No JS bytecode provided');
+      }
+      
       const stream = await moon.run(js);
       let buffer = '';
       
@@ -85,7 +103,7 @@ export class MoonbitCompiler {
       
       return buffer;
     } catch (error) {
-      throw new Error(`JS execution failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`JS execution failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack : ''}`);
     }
   }
 }
