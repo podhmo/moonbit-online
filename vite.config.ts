@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/moonbit-online/' : '/',
+export default defineConfig(({ command, mode }) => ({
+  base: command === 'build' || mode === 'production' ? '/moonbit-online/' : '/',
   plugins: [preact()],
   worker: {
     format: 'es'

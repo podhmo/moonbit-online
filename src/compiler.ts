@@ -14,7 +14,7 @@ async function ensureMoonInit() {
     const base = import.meta.env.BASE_URL;
     moonInstance = moonbitMode.init({
       onigWasmUrl: `${base}onig.wasm`,
-      mooncWorkerFactory: () => new Worker(`${base}moonc-worker.js`, { type: 'module' })
+      mooncWorkerFactory: () => new Worker(`${base}moonc-worker.js`)
     });
     moonInitialized = true;
   }
