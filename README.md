@@ -22,6 +22,8 @@ git clone https://github.com/podhmo/moonbit-online.git
 cd moonbit-online
 
 npm install
+mkdir -p public
+cp node_modules/@moonbit/moonpad-monaco/dist/*.js node_modules/@moonbit/moonpad-monaco/dist/*.wasm public/
 npm run dev
 ```
 

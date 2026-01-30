@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build && npm run copy-workers",
     "copy-workers": "cp public/*.js public/*.wasm dist/",
+    "postinstall": "mkdir -p public && cp node_modules/@moonbit/moonpad-monaco/dist/*.js node_modules/@moonbit/moonpad-monaco/dist/*.wasm public/",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,11 +20,8 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@moonbit/moonc-worker": "^0.1.202601103",
     "@moonbit/moonpad-monaco": "^0.1.202510171",
     "@picocss/pico": "^2.1.1",
-    "comlink": "^4.4.2",
-    "monaco-editor-core": "^0.52.0",
     "preact": "^10.28.2"
   }
 }
