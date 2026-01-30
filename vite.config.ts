@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
-export default defineConfig({
-  base: '/moonbit-online/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/moonbit-online/' : '/',
   plugins: [preact()],
   worker: {
     format: 'es'
@@ -10,4 +10,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@moonbit/moonc-worker']
   }
-})
+}))
