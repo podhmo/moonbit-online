@@ -12,6 +12,12 @@ export function MonacoEditor({ value, onChange, language = 'plaintext', height =
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const isUpdatingFromProps = useRef(false);
+  const onChangeRef = useRef(onChange);
+
+  // Keep onChange ref up to date
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -30,6 +36,7 @@ export function MonacoEditor({ value, onChange, language = 'plaintext', height =
       // Line number configuration with custom formatting
       lineNumbers: (lineNumber: number) => {
         // Zero-pad to 3 digits (001, 002, etc.)
+        // Note: Hardcoded to 3 digits as files rarely exceed 999 lines in typical usage
         return lineNumber.toString().padStart(3, '0');
       },
       lineNumbersMinChars: 4, // Reserve space for 3 digits + 1 space
@@ -45,7 +52,7 @@ export function MonacoEditor({ value, onChange, language = 'plaintext', height =
     editor.onDidChangeModelContent(() => {
       if (!isUpdatingFromProps.current) {
         const newValue = editor.getValue();
-        onChange(newValue);
+        onChangeRef.current(newValue);
       }
     });
 
