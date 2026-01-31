@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
+import { MonacoEditor } from './MonacoEditor';
 
 const compiler = new MoonbitCompiler();
 
@@ -177,15 +178,11 @@ export function App() {
             ))}
           </select>
         </div>
-        <textarea
+        <MonacoEditor
           value={code}
-          onInput={(e) => setCode((e.target as HTMLTextAreaElement).value)}
-          rows={15}
-          style={{ 
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            lineHeight: '1.5'
-          }}
+          onChange={setCode}
+          language="plaintext"
+          height="400px"
         />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
