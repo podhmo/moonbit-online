@@ -150,6 +150,15 @@ export function App() {
     setCode(SAMPLE_CODES[value]);
   };
 
+  const handleCopyOutput = () => {
+    navigator.clipboard.writeText(output).then(() => {
+      alert('Output copied to clipboard!');
+    }).catch((err) => {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy output to clipboard');
+    });
+  };
+
   return (
     <main class="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -196,21 +205,29 @@ export function App() {
       </section>
       
       <section>
-        <label>
-          Output
-          <pre style={{ 
-            background: isError ? '#2d1a1a' : '#1a1a1a',
-            borderLeft: isError ? '4px solid #e74c3c' : 'none',
-            padding: '1rem', 
-            borderRadius: '0.25rem',
-            minHeight: '150px',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
-            color: isError ? '#ff6b6b' : 'inherit'
-          }}>
-            {output || 'Ready to run...'}
-          </pre>
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <label style={{ margin: 0 }}>Output</label>
+          <button 
+            onClick={handleCopyOutput} 
+            class="secondary"
+            style={{ width: 'auto', marginBottom: 0, padding: '0.5rem 1rem' }}
+            disabled={!output || output === 'Ready to run...'}
+          >
+            Copy Output
+          </button>
+        </div>
+        <pre style={{ 
+          background: isError ? '#2d1a1a' : '#1a1a1a',
+          borderLeft: isError ? '4px solid #e74c3c' : 'none',
+          padding: '1rem', 
+          borderRadius: '0.25rem',
+          minHeight: '150px',
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          color: isError ? '#ff6b6b' : 'inherit'
+        }}>
+          {output || 'Ready to run...'}
+        </pre>
       </section>
     </main>
   );
