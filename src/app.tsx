@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
-import { MonacoEditor } from './MonacoEditor';
+import { LineNumberEditor } from './LineNumberEditor';
 
 const compiler = new MoonbitCompiler();
 
@@ -159,6 +159,10 @@ export function App() {
     });
   };
 
+  const handleClearAll = () => {
+    setCode('');
+  };
+
   return (
     <main class="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -187,10 +191,9 @@ export function App() {
             ))}
           </select>
         </div>
-        <MonacoEditor
+        <LineNumberEditor
           value={code}
           onChange={setCode}
-          language="plaintext"
           height="400px"
         />
         
@@ -200,6 +203,9 @@ export function App() {
           </button>
           <button onClick={handleShare} class="secondary">
             Share
+          </button>
+          <button onClick={handleClearAll} class="secondary">
+            Clear All
           </button>
         </div>
       </section>
