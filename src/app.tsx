@@ -160,9 +160,7 @@ export function App() {
   };
 
   const handleClearAll = () => {
-    if (confirm('Clear all code?')) {
-      setCode('');
-    }
+    setCode('');
   };
 
   return (
