@@ -44,6 +44,18 @@ export function MonacoEditor({ value, onChange, language = 'plaintext', height =
       folding: false,
       lineDecorationsWidth: 5,
       renderLineHighlight: 'all',
+      // Disable features that interfere with normal copy-paste
+      quickSuggestions: false,
+      suggestOnTriggerCharacters: false,
+      acceptSuggestionOnCommitCharacter: false,
+      acceptSuggestionOnEnter: 'off',
+      wordBasedSuggestions: 'off',
+      parameterHints: { enabled: false },
+      autoClosingBrackets: 'never',
+      autoClosingQuotes: 'never',
+      autoSurround: 'never',
+      formatOnPaste: false,
+      formatOnType: false,
     });
 
     monacoEditorRef.current = editor;
