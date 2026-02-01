@@ -13,16 +13,20 @@ export function LineNumberEditor({ value, onChange, height = '400px' }: LineNumb
   // Count lines in the current value
   const lines = value.split('\n');
   const lineCount = lines.length;
-
-  // Synchronize scroll between line numbers and textarea
-  const handleScroll = () => {
-    if (textareaRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
-    }
-  };
+  
+  // Calculate padding based on line count
+  const padding = Math.max(3, String(lineCount).length);
 
   useEffect(() => {
     const textarea = textareaRef.current;
+    const lineNumbers = lineNumbersRef.current;
+    
+    const handleScroll = () => {
+      if (textarea && lineNumbers) {
+        lineNumbers.scrollTop = textarea.scrollTop;
+      }
+    };
+    
     if (textarea) {
       textarea.addEventListener('scroll', handleScroll);
       return () => textarea.removeEventListener('scroll', handleScroll);
@@ -42,7 +46,7 @@ export function LineNumberEditor({ value, onChange, height = '400px' }: LineNumb
       <div
         ref={lineNumbersRef}
         style={{
-          width: '48px',
+          width: `${padding * 8 + 16}px`,
           background: '#0d0d0d',
           color: '#6e7681',
           fontSize: '14px',
@@ -60,7 +64,7 @@ export function LineNumberEditor({ value, onChange, height = '400px' }: LineNumb
       >
         {Array.from({ length: lineCount }, (_, i) => (
           <div key={i}>
-            {String(i + 1).padStart(3, '0')}
+            {String(i + 1).padStart(padding, '0')}
           </div>
         ))}
       </div>
