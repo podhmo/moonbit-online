@@ -49,7 +49,7 @@ export class MoonbitCompiler {
     try {
       const result = await moon.compile({
         libInputs: isTest ? [] : files,
-        testInputs: isTest ? files : undefined,
+        testInputs: isTest ? files : [],
         debugMain: !isTest
       });
 

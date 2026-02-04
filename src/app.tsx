@@ -28,12 +28,6 @@ test "multiply function" {
   assert_eq!(multiply(2, 3), 6)
   assert_eq!(multiply(0, 5), 0)
   assert_eq!(multiply(-2, 3), -6)
-}
-
-fn main {
-  println("Use the Test button to run tests!")
-  println("add(5, 3) = \\{add(5, 3)}")
-  println("multiply(4, 7) = \\{multiply(4, 7)}")
 }`,
   'Multiple Files': `fn main {
   hello()
