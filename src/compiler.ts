@@ -149,7 +149,7 @@ export class MoonbitCompiler {
               const testName = chunk.test_name || 'unknown';
               const message = chunk.message || '';
               
-              if (message.includes('FAILED') || message.toLowerCase().includes('fail')) {
+              if (message.toLowerCase().includes('fail')) {
                 failCount++;
                 buffer += `❌ ${testName}: ${message}\n`;
               } else {
