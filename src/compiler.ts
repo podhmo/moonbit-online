@@ -6,6 +6,15 @@ export interface CompileResult {
   error?: string;
 }
 
+export interface TestOutput {
+  kind: 'stdout' | 'result';
+  stdout?: string;
+  package?: string;
+  filename?: string;
+  test_name?: string;
+  message?: string;
+}
+
 let moonInitialized = false;
 let moonInstance: ReturnType<typeof moonbitMode.init> | null = null;
 
@@ -27,12 +36,21 @@ export class MoonbitCompiler {
   }
 
   async compileMultiple(files: Array<[string, string]>): Promise<CompileResult> {
+    return this.compileInternal(files, false);
+  }
+
+  async compileForTest(files: Array<[string, string]>): Promise<CompileResult> {
+    return this.compileInternal(files, true);
+  }
+
+  private async compileInternal(files: Array<[string, string]>, isTest: boolean): Promise<CompileResult> {
     const moon = await ensureMoonInit();
     
     try {
       const result = await moon.compile({
-        libInputs: files,
-        debugMain: true
+        libInputs: isTest ? [] : files,
+        testInputs: isTest ? files : undefined,
+        debugMain: !isTest
       });
 
       if (result.kind === 'error') {
@@ -104,6 +122,54 @@ export class MoonbitCompiler {
       return buffer;
     } catch (error) {
       throw new Error(`JS execution failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack : ''}`);
+    }
+  }
+
+  async runTest(js: Uint8Array): Promise<string> {
+    const moon = await ensureMoonInit();
+    
+    try {
+      if (!js || js.length === 0) {
+        throw new Error('No JS bytecode provided');
+      }
+      
+      const stream = await moon.test(js);
+      let buffer = '';
+      let testCount = 0;
+      let passCount = 0;
+      let failCount = 0;
+      
+      await stream.pipeTo(
+        new WritableStream({
+          write(chunk: TestOutput) {
+            if (chunk.kind === 'stdout') {
+              buffer += chunk.stdout || '';
+            } else if (chunk.kind === 'result') {
+              testCount++;
+              const testName = chunk.test_name || 'unknown';
+              const message = chunk.message || '';
+              
+              if (message.includes('FAILED') || message.toLowerCase().includes('fail')) {
+                failCount++;
+                buffer += `❌ ${testName}: ${message}\n`;
+              } else {
+                passCount++;
+                buffer += `✅ ${testName}: ${message}\n`;
+              }
+            }
+          }
+        })
+      );
+      
+      // Add summary
+      if (testCount > 0) {
+        buffer += `\n--- Test Summary ---\n`;
+        buffer += `Total: ${testCount}, Passed: ${passCount}, Failed: ${failCount}\n`;
+      }
+      
+      return buffer;
+    } catch (error) {
+      throw new Error(`Test execution failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack : ''}`);
     }
   }
 }

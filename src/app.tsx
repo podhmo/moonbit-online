@@ -10,6 +10,31 @@ const SAMPLE_CODES = {
   let x = 42
   println("The answer is \\{x}")
 }`,
+  'With Tests': `fn add(a : Int, b : Int) -> Int {
+  a + b
+}
+
+fn multiply(a : Int, b : Int) -> Int {
+  a * b
+}
+
+test "add function" {
+  assert_eq!(add(1, 2), 3)
+  assert_eq!(add(0, 0), 0)
+  assert_eq!(add(-1, 1), 0)
+}
+
+test "multiply function" {
+  assert_eq!(multiply(2, 3), 6)
+  assert_eq!(multiply(0, 5), 0)
+  assert_eq!(multiply(-2, 3), -6)
+}
+
+fn main {
+  println("Use the Test button to run tests!")
+  println("add(5, 3) = \\{add(5, 3)}")
+  println("multiply(4, 7) = \\{multiply(4, 7)}")
+}`,
   'Multiple Files': `fn main {
   hello()
   let result = add(10, 20)
@@ -96,6 +121,7 @@ export function App() {
   const [code, setCode] = useState(loadCodeFromHash());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [isError, setIsError] = useState(false);
   const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
 
@@ -133,6 +159,32 @@ export function App() {
       setIsError(true);
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setOutput('Compiling for tests...');
+    setIsError(false);
+    
+    try {
+      const files = parseMultipleFiles(code);
+      const compileResult = await compiler.compileForTest(files);
+      
+      if (!compileResult.success) {
+        setOutput(`Compilation Error:\n${compileResult.error}`);
+        setIsError(true);
+        return;
+      }
+      
+      setOutput('Running tests...');
+      const result = await compiler.runTest(compileResult.js!);
+      setOutput(`Test Results:\n${result || '(no test output)'}`);
+    } catch (error) {
+      setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      setIsError(true);
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -198,8 +250,11 @@ export function App() {
         />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-          <button onClick={handleRun} disabled={isRunning}>
+          <button onClick={handleRun} disabled={isRunning || isTesting}>
             {isRunning ? 'Running...' : 'Run'}
+          </button>
+          <button onClick={handleTest} disabled={isRunning || isTesting} class="secondary">
+            {isTesting ? 'Testing...' : 'Test'}
           </button>
           <button onClick={handleShare} class="secondary">
             Share
