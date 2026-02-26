@@ -242,9 +242,6 @@ export function App() {
           <button onClick={handleFormat} class="secondary" disabled={isFormatting}>
             {isFormatting ? 'Formatting...' : 'Format'}
           </button>
-          <button onClick={handleShare} class="secondary">
-            Share
-          </button>
           <button onClick={handleClearAll} class="secondary">
             Clear All
           </button>
@@ -254,6 +251,13 @@ export function App() {
       <section>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <label style={{ margin: 0 }}>Output</label>
+          <button 
+            onClick={handleShare} 
+            class="secondary"
+            style={{ width: 'auto', marginBottom: 0, padding: '0.5rem 1rem' }}
+          >
+            Share
+          </button>
           <button 
             onClick={handleCopyOutput} 
             class="secondary"
