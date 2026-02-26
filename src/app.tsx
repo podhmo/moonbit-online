@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
+import type { TestResult } from './compiler';
 import { LineNumberEditor } from './LineNumberEditor';
 
 declare const __MOONPAD_VERSION__: string;
@@ -46,6 +47,23 @@ pub fn add(a : Int, b : Int) -> Int {
   }
   
   println("Map size: \\{map.size()}")
+}`,
+  'Test': `fn sum(data~ : Array[Int], start? : Int = 0, length? : Int) -> Int {
+  let end = if length is Some(length) { start + length } else { data.length() }
+  for i = start, sum = 0; i < end; i = i + 1, sum = sum + data[i] {
+  } else {
+    sum
+  }
+}
+
+test "sum" {
+  let array = [1, 2, 3, 4, 5]
+  inspect(sum(data=array), content="15")
+  inspect(sum(data=array, start=1), content="14")
+  inspect(sum(data=array, length=3), content="6")
+  let length = None
+  // Use \`?\` for punning
+  inspect(sum(data=array, length?), content="15")
 }`
 };
 
@@ -98,6 +116,7 @@ export function App() {
   const [code, setCode] = useState(loadCodeFromHash());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [isError, setIsError] = useState(false);
   const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
@@ -136,6 +155,44 @@ export function App() {
       setIsError(true);
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setOutput('Compiling tests...');
+    setIsError(false);
+
+    try {
+      const files = parseMultipleFiles(code);
+      const compileResult = await compiler.compileTest(files);
+
+      if (!compileResult.success) {
+        setOutput(`Compilation Error:\n${compileResult.error}`);
+        setIsError(true);
+        return;
+      }
+
+      setOutput('Running tests...');
+      const { output: stdout, results } = await compiler.runTest(compileResult.js!);
+      const passed = results.filter((r: TestResult) => r.message === '').length;
+      const failed = results.filter((r: TestResult) => r.message !== '').length;
+
+      const summary = `Test Results: ${passed} passed, ${failed} failed\n`;
+      const details = results.map((r: TestResult) => {
+        const status = r.message === '' ? '✓ PASS' : '✗ FAIL';
+        const base = `${status} ${r.filename}::${r.test_name}`;
+        return r.message !== '' ? `${base}\n  ${r.message}` : base;
+      }).join('\n');
+
+      const outputText = summary + details + (stdout ? `\n\nStdout:\n${stdout}` : '');
+      setOutput(outputText);
+      if (failed > 0) setIsError(true);
+    } catch (error) {
+      setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      setIsError(true);
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -217,8 +274,11 @@ export function App() {
         />
         
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-          <button onClick={handleRun} disabled={isRunning}>
+          <button onClick={handleRun} disabled={isRunning || isTesting}>
             {isRunning ? 'Running...' : 'Run'}
+          </button>
+          <button onClick={handleTest} disabled={isRunning || isTesting}>
+            {isTesting ? 'Testing...' : 'Test'}
           </button>
           <button onClick={handleFormat} class="secondary" disabled={isFormatting}>
             {isFormatting ? 'Formatting...' : 'Format'}
