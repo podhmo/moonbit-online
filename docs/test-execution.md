@@ -101,6 +101,40 @@ MoonBit のテストは引数なし（`test "name" { ... }`）と引数あり（
 
 ---
 
+## 2026-02 追加: Test ボタン時 warning ノイズ対応の振り返り（PR #51）
+
+### 何が起きていたか
+
+`genTestInfo` の出力には `with_bench_args_tests` / `async_tests` / `async_tests_with_args` が含まれますが、当リポジトリの `DRIVER_TEMPLATE` はそれらを利用していませんでした。  
+結果として `moonpad:/driver.mbt` 側で `unused_value` と `unresolved_type_variable` が連続して出力され、ユーザーコード由来の warning と混ざって判別しづらくなっていました。
+
+### 今回の意思決定（自前で書いた部分）
+
+`src/compiler.ts` で以下を実装しました（テスト側は `test/compiler-node.test.mjs` のヘルパーを同等更新）:
+
+- `normalizeGeneratedTestInfo()` を追加し、現行ドライバーで使わない map 宣言を削除してからテンプレートに埋め込む
+- `tests` / `no_args_tests` / `with_args_tests` の型を明示する helper 呼び出しをテンプレートへ追加
+- `Failure::Failure` / `InspectError::InspectError` の明示コンストラクタ記法へ変更
+- `@moonbitlang/core/test.T` を `@moonbitlang/core/test.Test` に更新
+
+### なぜこの対応が必要だったか
+
+- warning の主因がユーザーコードではなく `driver.mbt` 生成側にあったため
+- 現行 MoonBit では、暗黙推論に頼る map の束縛や暗黙コンストラクタ利用が warning 化されやすいため
+- Test ボタン利用時に「ユーザーが直すべき warning」を見分けやすくする必要があったため
+
+### upstream をそのまま使えるようにするための条件
+
+自前ロジックを減らすには、以下が揃うことが必要です。
+
+1. `@moonbit/moonpad-monaco` からテストドライバーテンプレートを公開 API として参照できること
+2. そのテンプレートが `@moonbit/moonc-worker` 同梱コンパイラと同じリリースサイクルで更新されること
+3. `genTestInfo` の出力 contract（使う map 名・型）がテンプレートと一緒に固定されること
+
+この 3 点が満たされれば、当リポジトリの自前実装（`DRIVER_TEMPLATE` と `normalizeGeneratedTestInfo()`）は削除して upstream 参照に置き換えられます。
+
+---
+
 ## 残課題
 
 | 課題 | 内容 | アップストリーム依存 |

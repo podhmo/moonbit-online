@@ -250,9 +250,24 @@ const MOON_TEST_DELIMITER_END = '----- END MOON TEST RESULT -----';
 const DRIVER_TEMPLATE_REPLACEMENT =
   'let tests = {  } // WILL BE REPLACED\n  let no_args_tests = {  } // WILL BE REPLACED\n  let with_args_tests = {  } // WILL BE REPLACED';
 
+function normalizeTestInfo(testInfo) {
+  return testInfo.replace(
+    /^\s*let (with_bench_args_tests|async_tests|async_tests_with_args)\s*=.*\n?/gm,
+    '',
+  );
+}
+
 // Minimal test driver template compatible with the current MoonBit compiler.
 const DRIVER_TEMPLATE = `// Generated test driver
 type TestDriver_No_Args_Function = () -> Unit raise Error
+type TestDriver_With_Args_Function = (@moonbitlang/core/test.Test) -> Unit raise Error
+
+type TestDriver_Tests_Map = @moonbitlang/core/builtin.Map[
+  String,
+  @moonbitlang/core/builtin.Array[
+    (TestDriver_No_Args_Function, @moonbitlang/core/builtin.Array[String]),
+  ],
+]
 
 type TestDriver_No_Args_Map = @moonbitlang/core/builtin.Map[
   String,
@@ -262,7 +277,23 @@ type TestDriver_No_Args_Map = @moonbitlang/core/builtin.Map[
   ],
 ]
 
+type TestDriver_With_Args_Map = @moonbitlang/core/builtin.Map[
+  String,
+  @moonbitlang/core/builtin.Map[
+    Int,
+    (TestDriver_With_Args_Function, @moonbitlang/core/builtin.Array[String]),
+  ],
+]
+
+fn typing_tests(x : TestDriver_Tests_Map) -> Unit {
+  ignore(x)
+}
+
 fn typing_no_args_tests(x : TestDriver_No_Args_Map) -> Unit {
+  ignore(x)
+}
+
+fn typing_with_args_tests(x : TestDriver_With_Args_Map) -> Unit {
   ignore(x)
 }
 
@@ -270,9 +301,9 @@ fn main {
   let tests = {  } // WILL BE REPLACED
   let no_args_tests = {  } // WILL BE REPLACED
   let with_args_tests = {  } // WILL BE REPLACED
-  ignore(tests)
+  typing_tests(tests)
   typing_no_args_tests(no_args_tests)
-  ignore(with_args_tests)
+  typing_with_args_tests(with_args_tests)
   no_args_tests
   .iter()
   .each(
@@ -291,7 +322,7 @@ fn main {
             func()
             ""
           } catch {
-            Failure(e) | InspectError(e) => e
+            Failure::Failure(e) | InspectError::InspectError(e) => e
             _ => "unexpected error"
           }
           println("{BEGIN_MOONTEST}")
@@ -310,7 +341,8 @@ fn main {
  * Returns { core, diagnostics }.
  */
 async function buildTestPackage(worker, mbtFiles) {
-  const testInfo = await callWorker(worker, 'genTestInfo', { mbtFiles });
+  const rawTestInfo = await callWorker(worker, 'genTestInfo', { mbtFiles });
+  const testInfo = normalizeTestInfo(rawTestInfo);
   const driverContent = DRIVER_TEMPLATE
     .replace(DRIVER_TEMPLATE_REPLACEMENT, testInfo)
     .replace('{PACKAGE}', 'moonpad/lib')
@@ -407,6 +439,21 @@ test "sum" {
     assert.equal(results.length, 1, 'should have one test result');
     assert.equal(results[0].test_name, 'sum', 'test name should be "sum"');
     assert.equal(results[0].message, '', 'passing test should have empty message');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('moon test: driver does not emit moonpad template warnings', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const source = readFileSync(join(samplesDir, '05_test.mbt'), 'utf-8');
+    const buildResult = await buildTestPackage(worker, [['main.mbt', source]]);
+    const warningDiagnostics = buildResult.diagnostics
+      .map(d => (typeof d === 'string' ? JSON.parse(d) : d))
+      .filter(d => d.level === 'warning');
+
+    assert.equal(warningDiagnostics.length, 0, 'test driver should not produce warning diagnostics');
   } finally {
     worker.terminate();
   }
