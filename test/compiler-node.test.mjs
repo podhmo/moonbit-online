@@ -59,6 +59,7 @@ async function buildPackage(worker, mbtFiles) {
   return callWorker(worker, 'buildPackage', {
     mbtFiles,
     miFiles: [],
+    indirectImportMiFiles: [],
     stdMiFiles: STD_MI_FILES,
     target: 'js',
     pkg: 'moonpad/lib',

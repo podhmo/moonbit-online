@@ -20,7 +20,7 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@moonbit/moonpad-monaco": "0.1.202510171",
+    "@moonbit/moonpad-monaco": "0.1.202602253",
     "@picocss/pico": "^2.1.1",
     "preact": "^10.28.2"
   }
