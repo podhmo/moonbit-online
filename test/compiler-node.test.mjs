@@ -224,6 +224,206 @@ test('compile and run multiple files', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test mode helpers
+// ---------------------------------------------------------------------------
+
+const MOON_TEST_DELIMITER_BEGIN = '----- BEGIN MOON TEST RESULT -----';
+const MOON_TEST_DELIMITER_END = '----- END MOON TEST RESULT -----';
+
+// Replacement marker that genTestInfo output replaces in the driver template.
+const DRIVER_TEMPLATE_REPLACEMENT =
+  'let tests = {  } // WILL BE REPLACED\n  let no_args_tests = {  } // WILL BE REPLACED\n  let with_args_tests = {  } // WILL BE REPLACED';
+
+// Minimal test driver template compatible with the current MoonBit compiler.
+const DRIVER_TEMPLATE = `// Generated test driver
+type TestDriver_No_Args_Function = () -> Unit raise Error
+
+type TestDriver_No_Args_Map = @moonbitlang/core/builtin.Map[
+  String,
+  @moonbitlang/core/builtin.Map[
+    Int,
+    (TestDriver_No_Args_Function, @moonbitlang/core/builtin.Array[String]),
+  ],
+]
+
+fn typing_no_args_tests(x : TestDriver_No_Args_Map) -> Unit {
+  ignore(x)
+}
+
+fn main {
+  let tests = {  } // WILL BE REPLACED
+  let no_args_tests = {  } // WILL BE REPLACED
+  let with_args_tests = {  } // WILL BE REPLACED
+  ignore(tests)
+  typing_no_args_tests(no_args_tests)
+  ignore(with_args_tests)
+  no_args_tests
+  .iter()
+  .each(
+    fn(file) {
+      let filename = file.0
+      let cases = file.1
+      cases
+      .iter()
+      .each(
+        fn(case_entry) {
+          let idx = case_entry.0
+          let func = case_entry.1.0
+          let attrs = case_entry.1.1
+          let name = if attrs.is_empty() { idx.to_string() } else { attrs[0] }
+          let message = try {
+            func()
+            ""
+          } catch {
+            Failure(e) | InspectError(e) => e
+            _ => "unexpected error"
+          }
+          println("{BEGIN_MOONTEST}")
+          println(
+            "{\\"package\\": \\"{PACKAGE}\\", \\"filename\\": \\{filename.escape()}, \\"test_name\\": \\{name.escape()}, \\"message\\": \\{message.escape()}}",
+          )
+          println("{END_MOONTEST}")
+        },
+      )
+    },
+  )
+}`;
+
+/**
+ * Build a test package: calls genTestInfo, creates the driver, then buildPackage.
+ * Returns { core, diagnostics }.
+ */
+async function buildTestPackage(worker, mbtFiles) {
+  const testInfo = await callWorker(worker, 'genTestInfo', { mbtFiles });
+  const driverContent = DRIVER_TEMPLATE
+    .replace(DRIVER_TEMPLATE_REPLACEMENT, testInfo)
+    .replace('{PACKAGE}', 'moonpad/lib')
+    .replace('{BEGIN_MOONTEST}', MOON_TEST_DELIMITER_BEGIN)
+    .replace('{END_MOONTEST}', MOON_TEST_DELIMITER_END);
+
+  // Strip any empty `fn main {}` from user files; the driver provides its own fn main.
+  const userFiles = mbtFiles.map(([name, content]) => [
+    name,
+    content.replace(/\bfn\s+main\s*\{\s*\}/gs, ''),
+  ]);
+  return callWorker(worker, 'buildPackage', {
+    mbtFiles: [...userFiles, ['driver.mbt', driverContent]],
+    miFiles: [],
+    indirectImportMiFiles: [],
+    stdMiFiles: STD_MI_FILES,
+    target: 'js',
+    pkg: 'moonpad/lib',
+    pkgSources: ['moonpad/lib:moonpad:/'],
+    isMain: true,
+    noOpt: false,
+    enableValueTracing: false,
+    errorFormat: 'json',
+  });
+}
+
+/**
+ * Link test package core into a runnable JS module (testMode: true).
+ */
+async function linkTestCore(worker, packageCore) {
+  return callWorker(worker, 'linkCore', {
+    coreFiles: [CORE_FILE, packageCore],
+    main: 'moonpad/lib_blackbox_test',
+    pkgSources: [
+      'moonbitlang/core:moonbit-core:/lib/core',
+      'moonpad/lib:moonpad:/',
+    ],
+    target: 'js',
+    exportedFunctions: [],
+    outputFormat: 'wasm',
+    testMode: true,
+    debug: false,
+    stopOnMain: false,
+    noOpt: false,
+    sourceMap: false,
+    sourceMapUrl: '',
+    sources: {},
+  });
+}
+
+/**
+ * Parse test output from compiled test JS into an array of TestResult objects.
+ */
+function parseTestOutput(raw) {
+  const lines = raw.split('\n');
+  const results = [];
+  let inSection = false;
+  for (const line of lines) {
+    if (line === MOON_TEST_DELIMITER_BEGIN) { inSection = true; }
+    else if (line === MOON_TEST_DELIMITER_END) { inSection = false; }
+    else if (inSection) {
+      try { results.push(JSON.parse(line)); } catch { /* malformed lines are silently skipped */ }
+    }
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Moon test mode tests
+// ---------------------------------------------------------------------------
+
+test('moon test: passing test is reported as passed', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const source = `fn sum(data~ : Array[Int]) -> Int {
+  data.fold(init=0, fn(acc, x) { acc + x })
+}
+
+test "sum" {
+  inspect(sum(data=[1, 2, 3]), content="6")
+}`;
+
+    const buildResult = await buildTestPackage(worker, [['main.mbt', source]]);
+    const errors = buildResult.diagnostics.filter(d => {
+      const p = typeof d === 'string' ? JSON.parse(d) : d;
+      return p.level === 'error';
+    });
+    assert.equal(errors.length, 0, 'should compile without errors');
+
+    const linkResult = await linkTestCore(worker, buildResult.core);
+    const output = runCompiledJs(linkResult.result);
+    const results = parseTestOutput(output);
+
+    assert.equal(results.length, 1, 'should have one test result');
+    assert.equal(results[0].test_name, 'sum', 'test name should be "sum"');
+    assert.equal(results[0].message, '', 'passing test should have empty message');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('moon test: failing test is reported as failed', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const source = `test "always fails" {
+  inspect(1 + 1, content="3")
+}`;
+
+    const buildResult = await buildTestPackage(worker, [['main.mbt', source]]);
+    const errors = buildResult.diagnostics.filter(d => {
+      const p = typeof d === 'string' ? JSON.parse(d) : d;
+      return p.level === 'error';
+    });
+    assert.equal(errors.length, 0, 'should compile without errors');
+
+    const linkResult = await linkTestCore(worker, buildResult.core);
+    const output = runCompiledJs(linkResult.result);
+    const results = parseTestOutput(output);
+
+    assert.equal(results.length, 1, 'should have one test result');
+    assert.equal(results[0].test_name, 'always fails', 'test name should match');
+    assert.ok(results[0].message !== '', 'failing test should have non-empty message');
+    assert.ok(results[0].message.includes('actual'), 'failure message should contain actual value');
+  } finally {
+    worker.terminate();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // LSP formatter helpers
 // ---------------------------------------------------------------------------
 
@@ -454,15 +654,31 @@ const EXPECTED_OUTPUTS = {
   'Comprehensive Demo': '=== MoonBit Feature Showcase ===',
 };
 
+/**
+ * Returns true if the given mbtFiles represent a test-only package:
+ * has test blocks but no meaningful fn main (only an empty stub at most).
+ */
+function isTestOnlyPackage(mbtFiles) {
+  const allContent = mbtFiles.map(([, c]) => c).join('\n');
+  const hasTestBlock = /^test\s+/m.test(allContent);
+  // An empty fn main {} is just a stub to allow run-mode compilation; treat as test-only.
+  const mainBody = allContent.replace(/\bfn\s+main\s*\{\s*\}/gs, '');
+  const hasRealMain = /\bfn\s+main\b/.test(mainBody);
+  return hasTestBlock && !hasRealMain;
+}
+
 for (const sampleFile of sampleFiles) {
   const displayName = sampleDisplayName(sampleFile);
   const source = readFileSync(join(samplesDir, sampleFile), 'utf-8');
   const mbtFiles = parseSampleFiles(source);
+  const testOnly = isTestOnlyPackage(mbtFiles);
 
   test(`sample: ${displayName} — compiles without errors`, async () => {
     const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
     try {
-      const buildResult = await buildPackage(worker, mbtFiles);
+      const buildResult = testOnly
+        ? await buildTestPackage(worker, mbtFiles)
+        : await buildPackage(worker, mbtFiles);
       // Filter out warning-level diagnostics; only fail on errors
       const errors = buildResult.diagnostics.filter(d => {
         try { return JSON.parse(d).level === 'error'; } catch { return true; }
@@ -476,16 +692,25 @@ for (const sampleFile of sampleFiles) {
   test(`sample: ${displayName} — runs and produces expected output`, async () => {
     const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
     try {
-      const buildResult = await buildPackage(worker, mbtFiles);
+      const buildResult = testOnly
+        ? await buildTestPackage(worker, mbtFiles)
+        : await buildPackage(worker, mbtFiles);
       const errors = buildResult.diagnostics.filter(d => {
         try { return JSON.parse(d).level === 'error'; } catch { return true; }
       });
       assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
-      const linkResult = await linkCore(worker, buildResult.core);
+      const linkResult = testOnly
+        ? await linkTestCore(worker, buildResult.core)
+        : await linkCore(worker, buildResult.core);
       const output = runCompiledJs(linkResult.result);
       const expected = EXPECTED_OUTPUTS[displayName];
       if (expected) {
         assert.ok(output.includes(expected), `${displayName}: output should contain "${expected}"`);
+      }
+      if (testOnly) {
+        const results = parseTestOutput(output);
+        const failed = results.filter(r => r.message !== '');
+        assert.equal(failed.length, 0, `${displayName}: all tests should pass`);
       }
     } finally {
       worker.terminate();
