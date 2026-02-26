@@ -271,20 +271,21 @@ export function App() {
             Copy Output
           </button>
         </div>
-        <pre style={{ 
-          background: '#222',
-          borderLeft: '4px solid #666',
-          padding: '1rem',
-          borderRadius: '0.25rem',
-          minHeight: '2.5rem',
-          whiteSpace: 'pre-wrap',
-          wordWrap: 'break-word',
-          color: '#a8a8a8',
-          marginBottom: '0.75rem',
-          display: warningOutput ? 'block' : 'none'
-        }}>
-          {warningOutput}
-        </pre>
+        {warningOutput && (
+          <pre style={{ 
+            background: '#222',
+            borderLeft: '4px solid #666',
+            padding: '1rem',
+            borderRadius: '0.25rem',
+            minHeight: '2.5rem',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            color: '#a8a8a8',
+            marginBottom: '0.75rem'
+          }}>
+            {warningOutput}
+          </pre>
+        )}
         <pre style={{ 
           background: isError ? '#2d1a1a' : '#1a1a1a',
           borderLeft: isError ? '4px solid #e74c3c' : 'none',

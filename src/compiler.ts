@@ -362,7 +362,7 @@ self.postMessage({ __moonbit_done__: true });
             } else if (event.data?.__moonbit_log__ != null) {
               buffer += `${event.data.__moonbit_log__}\n`;
             } else if (event.data?.__moonbit_warn__ != null) {
-              warnings.push(String(event.data.__moonbit_warn__));
+              warnings.push(`runtime warning: ${String(event.data.__moonbit_warn__)}`);
             }
           };
           jsWorker.onerror = (event) => {
