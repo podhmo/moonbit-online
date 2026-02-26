@@ -120,4 +120,3 @@ MoonBit のテストは引数なし（`test "name" { ... }`）と引数あり（
 | `src/app.tsx` | Test ボタン、`handleTest()` |
 | `src/sample_codes/05_test.mbt` | テスト用サンプルコード（`sum` 関数 + `test "sum"` ブロック） |
 | `test/compiler-node.test.mjs` | テストモードの統合テスト（成功・失敗 各1件） |
-| `docs/report-run-test.md` | API 調査結果・実装構成の詳細 |
