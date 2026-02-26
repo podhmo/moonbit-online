@@ -160,6 +160,49 @@ test('compile error is reported correctly', async () => {
   }
 });
 
+test('compile error content is accessible', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    // Type error: assigning a string literal to an Int variable
+    const source = `fn main {\n  let x : Int = "not an int"\n  println(x)\n}`;
+
+    const buildResult = await buildPackage(worker, [['main.mbt', source]]);
+    assert.ok(buildResult.diagnostics.length > 0, 'should have compilation errors');
+
+    // Verify error content (message) is accessible in the diagnostic
+    const firstDiag = buildResult.diagnostics[0];
+    const parsed = typeof firstDiag === 'string' ? JSON.parse(firstDiag) : firstDiag;
+    assert.ok(parsed.message?.length > 0, 'diagnostic should have a non-empty message property');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('runtime error content is accessible', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    // Code that compiles successfully but panics at runtime
+    const source = `fn main {\n  panic()\n}`;
+
+    const buildResult = await buildPackage(worker, [['main.mbt', source]]);
+    assert.deepEqual(buildResult.diagnostics, [], 'should compile without errors');
+
+    const linkResult = await linkCore(worker, buildResult.core);
+
+    let caughtError = null;
+    try {
+      runCompiledJs(linkResult.result);
+    } catch (err) {
+      caughtError = err;
+    }
+    assert.ok(caughtError !== null, 'should throw a runtime error');
+    const errorMessage = caughtError instanceof Error ? caughtError.message : String(caughtError);
+    assert.ok(errorMessage.length > 0, 'runtime error message should be accessible');
+  } finally {
+    worker.terminate();
+  }
+});
+
 test('compile and run multiple files', async () => {
   const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
   try {
