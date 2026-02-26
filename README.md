@@ -1,6 +1,7 @@
 # 🌙 MoonBit Online
 
 MoonBitのWASMコンパイラを利用したブラウザ上で動作するオンラインプレイグラウンド。
+
 demo: https://podhmo.github.io/moonbit-online/
 
 ![Screenshot](docs/screenshot-multifile.png)
@@ -193,5 +194,5 @@ const code = decodeURIComponent(atob(hash));
 
 ---
 
-詳しい仕様は [spec.md](./spec.md) を参照してください。
+詳しい仕様は [spec.md](./docs/prototype-spec.md) を参照してください。
 作業状況は [TODO.md](./TODO.md) を参照してください。
