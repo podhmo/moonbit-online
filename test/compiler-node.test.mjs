@@ -399,3 +399,96 @@ pub fn hello() -> Unit {
     worker.terminate();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Sample code tests — compile and run every file in src/sample_codes/
+// ---------------------------------------------------------------------------
+
+import { readdirSync, readFileSync } from 'fs';
+
+/**
+ * Parse a multi-file MoonBit source string (using `-- filename --` separators)
+ * into an array of [filename, content] tuples, matching app.tsx parseMultipleFiles.
+ */
+function parseSampleFiles(source) {
+  const files = [];
+  const lines = source.split('\n');
+  let currentFile = 'main.mbt';
+  let currentContent = [];
+  for (const line of lines) {
+    const match = line.match(/^--\s+(.+?)\s+--$/);
+    if (match) {
+      if (currentContent.length > 0 || files.length === 0) {
+        files.push([currentFile, currentContent.join('\n')]);
+      }
+      currentFile = match[1].trim();
+      currentContent = [];
+    } else {
+      currentContent.push(line);
+    }
+  }
+  if (currentContent.length > 0 || files.length === 0) {
+    files.push([currentFile, currentContent.join('\n')]);
+  }
+  return files;
+}
+
+const samplesDir = join(__dir, '../src/sample_codes');
+const sampleFiles = readdirSync(samplesDir).filter(f => f.endsWith('.mbt')).sort();
+
+/** Derive the display name from a sample filename (matches Vite glob logic in app.tsx). */
+function sampleDisplayName(filename) {
+  return filename
+    .replace('.mbt', '')
+    .replace(/^\d+_/, '')
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+// Expected output snippets for each sample (keyed by display name).
+const EXPECTED_OUTPUTS = {
+  'Hello': 'Hello, MoonBit!',
+  'Multiple Files': 'Hello from lib.mbt!',
+  'With Package Import': "Value of 'b': 2",
+  'Comprehensive Demo': '=== MoonBit Feature Showcase ===',
+};
+
+for (const sampleFile of sampleFiles) {
+  const displayName = sampleDisplayName(sampleFile);
+  const source = readFileSync(join(samplesDir, sampleFile), 'utf-8');
+  const mbtFiles = parseSampleFiles(source);
+
+  test(`sample: ${displayName} — compiles without errors`, async () => {
+    const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+    try {
+      const buildResult = await buildPackage(worker, mbtFiles);
+      // Filter out warning-level diagnostics; only fail on errors
+      const errors = buildResult.diagnostics.filter(d => {
+        try { return JSON.parse(d).level === 'error'; } catch { return true; }
+      });
+      assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
+    } finally {
+      worker.terminate();
+    }
+  });
+
+  test(`sample: ${displayName} — runs and produces expected output`, async () => {
+    const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+    try {
+      const buildResult = await buildPackage(worker, mbtFiles);
+      const errors = buildResult.diagnostics.filter(d => {
+        try { return JSON.parse(d).level === 'error'; } catch { return true; }
+      });
+      assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
+      const linkResult = await linkCore(worker, buildResult.core);
+      const output = runCompiledJs(linkResult.result);
+      const expected = EXPECTED_OUTPUTS[displayName];
+      if (expected) {
+        assert.ok(output.includes(expected), `${displayName}: output should contain "${expected}"`);
+      }
+    } finally {
+      worker.terminate();
+    }
+  });
+}
