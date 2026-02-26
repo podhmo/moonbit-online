@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "vite build && npm run copy-workers",
     "copy-workers": "cp public/*.js public/*.wasm dist/",
-    "postinstall": "mkdir -p public && cp node_modules/@moonbit/moonpad-monaco/dist/*.js node_modules/@moonbit/moonpad-monaco/dist/*.wasm public/",
+    "postinstall": "mkdir -p public && cp node_modules/@moonbit/moonpad-monaco/dist/*.js node_modules/@moonbit/moonpad-monaco/dist/*.wasm public/ && node scripts/generate-core-map.mjs",
     "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/compiler-node.test.mjs"
   },
   "keywords": [],
   "author": "",
