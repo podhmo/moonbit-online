@@ -78,6 +78,7 @@ export function App() {
   const [isTesting, setIsTesting] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [isError, setIsError] = useState(false);
+  const [warningOutput, setWarningOutput] = useState('');
   const [selectedSample, setSelectedSample] = useState<string>(Object.keys(SAMPLE_CODES)[0]);
 
   // Load code from URL hash on mount
@@ -94,6 +95,7 @@ export function App() {
   const handleRun = async () => {
     setIsRunning(true);
     setOutput('Compiling...');
+    setWarningOutput('');
     setIsError(false);
     
     try {
@@ -107,8 +109,10 @@ export function App() {
       }
       
       setOutput('Running...');
-      const result = await compiler.runJs(compileResult.js!);
-      setOutput(`Output:\n${result || '(no output)'}`);
+      const { output: stdout, warnings: runtimeWarnings } = await compiler.runJs(compileResult.js!);
+      const warnings = [...(compileResult.warnings ?? []), ...runtimeWarnings];
+      setWarningOutput(warnings.length > 0 ? `Warnings:\n${warnings.join('\n')}` : '');
+      setOutput(`Output:\n${stdout || '(no output)'}`);
     } catch (error) {
       setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
       setIsError(true);
@@ -120,6 +124,7 @@ export function App() {
   const handleTest = async () => {
     setIsTesting(true);
     setOutput('Compiling tests...');
+    setWarningOutput('');
     setIsError(false);
 
     try {
@@ -133,9 +138,10 @@ export function App() {
       }
 
       setOutput('Running tests...');
-      const { output: stdout, results } = await compiler.runTest(compileResult.js!);
+      const { output: stdout, results, warnings: runtimeWarnings } = await compiler.runTest(compileResult.js!);
       const passed = results.filter((r: TestResult) => r.message === '').length;
       const failed = results.filter((r: TestResult) => r.message !== '').length;
+      const warnings = [...(compileResult.warnings ?? []), ...runtimeWarnings];
 
       const summary = `Test Results: ${passed} passed, ${failed} failed\n`;
       const details = results.map((r: TestResult) => {
@@ -145,10 +151,12 @@ export function App() {
       }).join('\n');
 
       const outputText = summary + details + (stdout ? `\n\nStdout:\n${stdout}` : '');
+      setWarningOutput(warnings.length > 0 ? `Warnings:\n${warnings.join('\n')}` : '');
       setOutput(outputText);
       if (failed > 0) setIsError(true);
     } catch (error) {
       setOutput(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      setWarningOutput('');
       setIsError(true);
     } finally {
       setIsTesting(false);
@@ -263,6 +271,20 @@ export function App() {
             Copy Output
           </button>
         </div>
+        <pre style={{ 
+          background: '#222',
+          borderLeft: '4px solid #666',
+          padding: '1rem',
+          borderRadius: '0.25rem',
+          minHeight: '2.5rem',
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          color: '#a8a8a8',
+          marginBottom: '0.75rem',
+          display: warningOutput ? 'block' : 'none'
+        }}>
+          {warningOutput}
+        </pre>
         <pre style={{ 
           background: isError ? '#2d1a1a' : '#1a1a1a',
           borderLeft: isError ? '4px solid #e74c3c' : 'none',
