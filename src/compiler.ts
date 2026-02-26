@@ -7,6 +7,7 @@ export interface CompileResult {
   success: boolean;
   js?: Uint8Array;
   error?: string;
+  warnings?: string[];
 }
 
 export interface TestResult {
@@ -153,11 +154,17 @@ export class MoonbitCompiler {
             }
           }
           return d;
-        })
-        .filter((d: { level?: string }) => d.level !== 'warning');
+        });
+      const errorsOnly = parsedDiagnostics.filter((d: { level?: string }) => d.level !== 'warning');
+      const warnings = parsedDiagnostics
+        .filter((d: { level?: string }) => d.level === 'warning')
+        .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
+          const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
+          return `${loc ? `${loc} - ` : ''}${d.message ?? 'Warning'}`;
+        });
 
-      if (parsedDiagnostics.length > 0 || !buildResult.core) {
-        const errors = parsedDiagnostics
+      if (errorsOnly.length > 0 || !buildResult.core) {
+        const errors = errorsOnly
           .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
             const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
             return `${loc ? `${loc} - ` : ''}${d.message ?? 'Compilation failed'}`;
@@ -194,7 +201,8 @@ export class MoonbitCompiler {
 
       return {
         success: true,
-        js: linkResult.result
+        js: linkResult.result,
+        warnings
       };
     } catch (error) {
       return {
@@ -244,11 +252,17 @@ export class MoonbitCompiler {
             try { return JSON.parse(d); } catch { return { level: 'error', message: d }; }
           }
           return d;
-        })
-        .filter((d: { level?: string }) => d.level !== 'warning');
+        });
+      const errorsOnly = parsedDiagnostics.filter((d: { level?: string }) => d.level !== 'warning');
+      const warnings = parsedDiagnostics
+        .filter((d: { level?: string }) => d.level === 'warning')
+        .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
+          const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
+          return `${loc ? `${loc} - ` : ''}${d.message ?? 'Warning'}`;
+        });
 
-      if (parsedDiagnostics.length > 0 || !buildResult.core) {
-        const errors = parsedDiagnostics
+      if (errorsOnly.length > 0 || !buildResult.core) {
+        const errors = errorsOnly
           .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
             const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
             return `${loc ? `${loc} - ` : ''}${d.message ?? 'Compilation failed'}`;
@@ -283,7 +297,7 @@ export class MoonbitCompiler {
         };
       }
 
-      return { success: true, js: linkResult.result };
+      return { success: true, js: linkResult.result, warnings };
     } catch (error) {
       return {
         success: false,
@@ -292,8 +306,8 @@ export class MoonbitCompiler {
     }
   }
 
-  async runTest(js: Uint8Array): Promise<{ output: string; results: TestResult[] }> {
-    const raw = await this.runJs(js);
+  async runTest(js: Uint8Array): Promise<{ output: string; results: TestResult[]; warnings: string[] }> {
+    const { output: raw, warnings } = await this.runJs(js);
     const lines = raw.split('\n');
     const results: TestResult[] = [];
     let inSection = false;
@@ -316,10 +330,10 @@ export class MoonbitCompiler {
       }
     }
 
-    return { output: stdoutLines.join('\n').trimEnd(), results };
+    return { output: stdoutLines.join('\n').trimEnd(), results, warnings };
   }
 
-  async runJs(js: Uint8Array): Promise<string> {
+  async runJs(js: Uint8Array): Promise<{ output: string; warnings: string[] }> {
     try {
       if (!js || js.length === 0) {
         throw new Error('No JS bytecode provided');
@@ -329,7 +343,8 @@ export class MoonbitCompiler {
       const workerCode = `
 self.console = {
   ...self.console,
-  log: (...args) => self.postMessage({ __moonbit_log__: args.map((x) => String(x)).join(' ') })
+  log: (...args) => self.postMessage({ __moonbit_log__: args.map((x) => String(x)).join(' ') }),
+  warn: (...args) => self.postMessage({ __moonbit_warn__: args.map((x) => String(x)).join(' ') })
 };
 ${code}
 self.postMessage({ __moonbit_done__: true });
@@ -337,6 +352,7 @@ self.postMessage({ __moonbit_done__: true });
       const blobUrl = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
       const jsWorker = new Worker(blobUrl, { type: 'module' });
       let buffer = '';
+      const warnings: string[] = [];
 
       try {
         await new Promise<void>((resolve, reject) => {
@@ -345,6 +361,8 @@ self.postMessage({ __moonbit_done__: true });
               resolve();
             } else if (event.data?.__moonbit_log__ != null) {
               buffer += `${event.data.__moonbit_log__}\n`;
+            } else if (event.data?.__moonbit_warn__ != null) {
+              warnings.push(`runtime warning: ${String(event.data.__moonbit_warn__)}`);
             }
           };
           jsWorker.onerror = (event) => {
@@ -356,7 +374,7 @@ self.postMessage({ __moonbit_done__: true });
         URL.revokeObjectURL(blobUrl);
       }
 
-      return buffer;
+      return { output: buffer, warnings };
     } catch (error) {
       throw new Error(`JS execution failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack : ''}`);
     }

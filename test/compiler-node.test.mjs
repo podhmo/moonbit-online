@@ -178,6 +178,22 @@ test('compile error content is accessible', async () => {
   }
 });
 
+test('compile warning content is accessible', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    // Unused variable should produce a warning while compilation still succeeds
+    const source = `fn main {\n  let unused = 10\n  println("ok")\n}`;
+
+    const buildResult = await buildPackage(worker, [['main.mbt', source]]);
+    const warningDiagnostics = buildResult.diagnostics
+      .map((d) => (typeof d === 'string' ? JSON.parse(d) : d))
+      .filter((d) => d.level === 'warning');
+    assert.ok(warningDiagnostics.length > 0, 'should have compilation warnings');
+  } finally {
+    worker.terminate();
+  }
+});
+
 test('runtime error content is accessible', async () => {
   const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
   try {
