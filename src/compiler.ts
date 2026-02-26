@@ -82,6 +82,13 @@ fn main {
 
 let worker: Worker | null = null;
 
+function resetWorker() {
+  if (worker) {
+    worker.terminate();
+    worker = null;
+  }
+}
+
 function ensureWorker() {
   if (!worker) {
     const base = import.meta.env.BASE_URL;
@@ -128,6 +135,7 @@ export class MoonbitCompiler {
 
   async compileMultiple(files: Array<[string, string]>): Promise<CompileResult> {
     try {
+      resetWorker();
       const stdMiFiles = getLoadPkgsParams('js').filter(([, data]) => data != null);
       const buildResult = await callWorker('buildPackage', {
         mbtFiles: files,
@@ -214,6 +222,7 @@ export class MoonbitCompiler {
 
   async compileTest(files: Array<[string, string]>): Promise<CompileResult> {
     try {
+      resetWorker();
       const stdMiFiles = getLoadPkgsParams('js').filter(([, data]: [string, unknown]) => data != null);
 
       const testInfo: string = await callWorker('genTestInfo', { mbtFiles: files });
