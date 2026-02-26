@@ -7,67 +7,25 @@ declare const __MOONPAD_VERSION__: string;
 
 const compiler = new MoonbitCompiler();
 
-const SAMPLE_CODES = {
-  'Hello': `fn main {
-  println("Hello, MoonBit!")
-  let x = 42
-  println("The answer is \\{x}")
-}`,
-  'Multiple Files': `fn main {
-  hello()
-  let result = add(10, 20)
-  println("10 + 20 = \\{result}")
-}
--- lib.mbt --
-pub fn hello() -> Unit {
-  println("Hello from lib.mbt!")
-}
+// Load sample codes from src/sample_codes/*.mbt at build time via Vite glob import.
+// File naming: NN_snake_case.mbt → display name (strip numeric prefix, titlecase).
+const _rawSamples = import.meta.glob('./sample_codes/*.mbt', { as: 'raw', eager: true });
+const SAMPLE_CODES: Record<string, string> = Object.fromEntries(
+  Object.entries(_rawSamples)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([path, content]) => {
+      const name = path
+        .replace('./sample_codes/', '')
+        .replace('.mbt', '')
+        .replace(/^\d+_/, '')
+        .split('_')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      return [name, content as string];
+    })
+);
 
-pub fn add(a : Int, b : Int) -> Int {
-  a + b
-}`,
-  'With Package Import': `fn main {
-  // Using @moonbitlang/core/hashmap package
-  let map = @hashmap.from_array([("a", 1), ("b", 2), ("c", 3)])
-  println("Initial map: \\{map}")
-  
-  // Remove an entry
-  map.remove("a") |> ignore
-  println("After removing 'a': \\{map}")
-  
-  // Add new entries
-  map.set("d", 4)
-  map.set("e", 5)
-  println("After adding 'd' and 'e': \\{map}")
-  
-  // Get a value
-  match map.get("b") {
-    Some(v) => println("Value of 'b': \\{v}")
-    None => println("Key 'b' not found")
-  }
-  
-  println("Map size: \\{map.size()}")
-}`,
-  'Test': `fn sum(data~ : Array[Int], start? : Int = 0, length? : Int) -> Int {
-  let end = if length is Some(length) { start + length } else { data.length() }
-  for i = start, sum = 0; i < end; i = i + 1, sum = sum + data[i] {
-  } else {
-    sum
-  }
-}
-
-test "sum" {
-  let array = [1, 2, 3, 4, 5]
-  inspect(sum(data=array), content="15")
-  inspect(sum(data=array, start=1), content="14")
-  inspect(sum(data=array, length=3), content="6")
-  let length = None
-  // Use \`?\` for punning
-  inspect(sum(data=array, length?), content="15")
-}`
-};
-
-const DEFAULT_CODE = SAMPLE_CODES['Hello'];
+const DEFAULT_CODE = Object.values(SAMPLE_CODES)[0];
 
 function parseMultipleFiles(source: string): Array<[string, string]> {
   const files: Array<[string, string]> = [];
@@ -119,7 +77,7 @@ export function App() {
   const [isTesting, setIsTesting] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [isError, setIsError] = useState(false);
-  const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
+  const [selectedSample, setSelectedSample] = useState<string>(Object.keys(SAMPLE_CODES)[0]);
 
   // Load code from URL hash on mount
   useEffect(() => {
@@ -205,7 +163,7 @@ export function App() {
   };
 
   const handleSampleChange = (e: Event) => {
-    const value = (e.target as HTMLSelectElement).value as keyof typeof SAMPLE_CODES;
+    const value = (e.target as HTMLSelectElement).value;
     setSelectedSample(value);
     setCode(SAMPLE_CODES[value]);
   };
