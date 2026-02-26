@@ -351,7 +351,7 @@ function parseTestOutput(raw) {
     if (line === MOON_TEST_DELIMITER_BEGIN) { inSection = true; }
     else if (line === MOON_TEST_DELIMITER_END) { inSection = false; }
     else if (inSection) {
-      try { results.push(JSON.parse(line)); } catch { /* ignore */ }
+      try { results.push(JSON.parse(line)); } catch { /* malformed lines are silently skipped */ }
     }
   }
   return results;

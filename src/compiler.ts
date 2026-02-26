@@ -303,7 +303,8 @@ export class MoonbitCompiler {
         try {
           results.push(JSON.parse(line) as TestResult);
         } catch {
-          // ignore malformed lines
+          // Malformed lines between delimiters are silently skipped;
+          // the driver only emits well-formed JSON there, so this is a no-op in practice.
         }
       } else {
         stdoutLines.push(line);
