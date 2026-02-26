@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
 import type { TestResult } from './compiler';
