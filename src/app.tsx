@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
+import { formatCode } from './formatter';
 import { LineNumberEditor } from './LineNumberEditor';
 
 declare const __MOONPAD_VERSION__: string;
@@ -98,6 +99,7 @@ export function App() {
   const [code, setCode] = useState(loadCodeFromHash());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
   const [isError, setIsError] = useState(false);
   const [selectedSample, setSelectedSample] = useState<keyof typeof SAMPLE_CODES>('Hello');
 
@@ -161,6 +163,18 @@ export function App() {
     });
   };
 
+  const handleFormat = async () => {
+    setIsFormatting(true);
+    try {
+      const formatted = await formatCode(code);
+      setCode(formatted);
+    } catch (error) {
+      console.error('Format failed:', error);
+    } finally {
+      setIsFormatting(false);
+    }
+  };
+
   const handleClearAll = () => {
     setCode('');
   };
@@ -205,6 +219,9 @@ export function App() {
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
           <button onClick={handleRun} disabled={isRunning}>
             {isRunning ? 'Running...' : 'Run'}
+          </button>
+          <button onClick={handleFormat} class="secondary" disabled={isFormatting}>
+            {isFormatting ? 'Formatting...' : 'Format'}
           </button>
           <button onClick={handleShare} class="secondary">
             Share
