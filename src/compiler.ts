@@ -216,7 +216,12 @@ export class MoonbitCompiler {
         .replace('{BEGIN_MOONTEST}', MOON_TEST_DELIMITER_BEGIN)
         .replace('{END_MOONTEST}', MOON_TEST_DELIMITER_END);
 
-      const allFiles: Array<[string, string]> = [...files, ['driver.mbt', driverContent]];
+      // Strip any empty `fn main {}` from user files; the driver provides its own fn main.
+      const userFiles = files.map(([name, content]): [string, string] => [
+        name,
+        content.replace(/\bfn\s+main\s*\{\s*\}/gs, '')
+      ]);
+      const allFiles: Array<[string, string]> = [...userFiles, ['driver.mbt', driverContent]];
 
       const buildResult = await callWorker('buildPackage', {
         mbtFiles: allFiles,
