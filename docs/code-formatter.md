@@ -113,6 +113,23 @@ Comlink ポートを受け取った後、LSP サーバーは通常の LSP プロ
 - 既存の `moonc-worker.js` と同じパターン（`postinstall` → `public/` → ブラウザから `/lsp-server.js` でアクセス）
 - `public/` は `.gitignore` に含まれているため、生成物はリポジトリに含まれない
 
+### 意思決定5: `formatter.ts` を動的インポートで遅延ロードする
+
+**決定**: `app.tsx` で `formatter.ts` を静的インポートせず、Format ボタンが**初めて押下されたタイミング**で動的 `import('./formatter')` で読み込む。
+
+```ts
+const handleFormat = async () => {
+  const { formatCode } = await import('./formatter');
+  // ...
+};
+```
+
+**理由**:
+- `lsp-server.js` は ~3.6 MB の大きなファイルで、フォーマット機能を使わないユーザーには不要
+- 動的インポートにより、Vite は `formatter.ts` とその依存を別チャンクに分割し、初期ロードから除外する
+- Format ボタン押下時の初回のみ追加コストが発生するが、以降は Worker がキャッシュされるため高速
+- `ensureWorker()` 内の Worker インスタンス自体も遅延生成（初回 `formatCode()` 呼び出し時のみ）されるため、モジュールロードと Worker 起動の両方が遅延する
+
 ---
 
 ## 遭遇したアクシデント

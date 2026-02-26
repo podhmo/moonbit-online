@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
-import { formatCode } from './formatter';
 import { LineNumberEditor } from './LineNumberEditor';
 
 declare const __MOONPAD_VERSION__: string;
@@ -166,6 +165,7 @@ export function App() {
   const handleFormat = async () => {
     setIsFormatting(true);
     try {
+      const { formatCode } = await import('./formatter');
       const formatted = await formatCode(code);
       setCode(formatted);
     } catch (error) {
