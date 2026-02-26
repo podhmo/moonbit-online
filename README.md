@@ -3,7 +3,7 @@
 MoonBitのWASMコンパイラを利用したブラウザ上で動作するオンラインプレイグラウンド。
 demo: https://podhmo.github.io/moonbit-online/
 
-![Screenshot](results/screenshot-multifile.png)
+![Screenshot](docs/screenshot-multifile.png)
 
 ## 特徴
 
@@ -138,7 +138,6 @@ fn main {
 
 実際の作業の際には ./TODO.md を読み一つずつ作業を進めてください。そして完了した場合はチェックボックスをonにしてください。
 必ず作業の最後にテストを実行して全てのテストが通ることを確認してください。
-成功しても失敗しても常に「振り返り」をresults/`%Y%m%d-%H%M.md`-(ok|ng).mdに記録してください。「振り返り」とは ./prompts.md に書かれた振り返りのプロンプトの実行のことです。
 
 
 ## 開発
@@ -152,7 +151,7 @@ moonbit-online/
 │   ├── compiler.ts      # MoonBitコンパイラのラッパー
 │   └── main.tsx         # エントリーポイント
 ├── public/              # 静的ファイル
-├── results/             # 振り返り・スクリーンショット
+├── docs/                # ドキュメント・スクリーンショット
 ├── index.html           # HTMLテンプレート
 ├── vite.config.ts       # Vite設定
 ├── tsconfig.json        # TypeScript設定
