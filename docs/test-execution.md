@@ -1,7 +1,6 @@
 # moon test 実行 — 意思決定・仕様・見込み違いの記録
 
 このドキュメントは `moon test` 実行機能（`compileTest` / `runTest`）の実装における意思決定・仕様・見込み違いを記録します。  
-調査の詳細や API の概要は [`docs/report-run-test.md`](./report-run-test.md) を参照してください。
 
 ---
 
