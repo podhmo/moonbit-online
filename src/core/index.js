@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { coreMap, corePkgs } from './core-map'
+import { coreMap, corePkgs } from './core-map.js'
 
 function getLoadPkgsParams(target = 'wasm-gc') {
   return corePkgs.map(pkg => {
