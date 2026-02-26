@@ -163,15 +163,15 @@ moonbit-online/
 ### コンパイルフロー
 
 1. ユーザーがMoonBitコードを入力
-2. `@moonbit/moonpad-monaco`を使用してコンパイル（JS出力）
-3. `moon.compile()` APIでJavaScriptコードを生成
-4. `moon.run()` APIで実行し、ReadableStreamで出力を取得
+2. `moonc-worker.js` の `buildPackage()` でパッケージをコンパイル
+3. `linkCore()` でJavaScriptコードを生成
+4. 生成したJavaScriptを専用Workerで実行し、`console.log`出力を取得
 5. 結果を画面に表示
 
 **技術的な詳細**:
 - JS出力方式により標準ライブラリが自動的に含まれる
 - Worker files（moonc-worker.js等）はpublic/に配置し、ルートパスから参照
-- moonbit-tourの実装を参考に、@moonbit/moonpad-monaco@0.1.202510171を使用
+- moonpad-monacoの実装を参考に、必要なcompile/run部分のみを利用
 
 ### URL共有の仕組み
 
