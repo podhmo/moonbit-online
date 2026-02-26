@@ -6,7 +6,6 @@ fn sum(data~ : Array[Int], start? : Int = 0, length? : Int) -> Int {
   }
 }
 
-fn main {}
 
 test "sum" {
   let array = [1, 2, 3, 4, 5]
