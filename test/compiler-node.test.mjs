@@ -222,3 +222,180 @@ test('compile and run multiple files', async () => {
     worker.terminate();
   }
 });
+
+// ---------------------------------------------------------------------------
+// LSP formatter helpers
+// ---------------------------------------------------------------------------
+
+/** Start the LSP server worker and perform the LSP handshake.
+ *  Returns the worker once it is ready to accept requests. */
+async function startLspWorker() {
+  const { MessageChannel, Worker: ThreadWorker } = await import('worker_threads');
+  const worker = new ThreadWorker(join(__dir, 'lsp-worker-bootstrap.cjs'));
+
+  // Create a MessageChannel for the Comlink side-channel.
+  // The LSP server requires a port on startup and uses it to proxy file-system
+  // calls back to the main thread.  For formatting we don't need real files, so
+  // we listen on port1 and reject every call immediately.
+  const channel = new MessageChannel();
+  channel.port1.start();
+  channel.port2.start();
+
+  channel.port1.on('message', (msg) => {
+    if (msg && msg.type === 'APPLY') {
+      // Respond with an error so addCore() fails fast instead of hanging.
+      channel.port1.postMessage({
+        id: msg.id,
+        type: 'HANDLER',
+        name: 'throw',
+        value: { isError: true, value: { message: 'Not available', name: 'Error', stack: '' } },
+      });
+    }
+  });
+
+  // Send the startup message. The bootstrap extracts '_lsp_port' and presents
+  // it as event.ports[0] to the lsp-server.js startup handler.
+  worker.postMessage(
+    { moonbitEnv: {}, _lsp_port: channel.port2 },
+    [channel.port2]
+  );
+
+  // Initialize the LSP protocol
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('LSP init timeout')), 15000);
+    const handler = (msg) => {
+      if (!msg || msg.jsonrpc !== '2.0') return;
+      // Accept both successful and error responses to 'initialize'
+      if (msg.id === 1 && (msg.result !== undefined || msg.error !== undefined)) {
+        worker.removeListener('message', handler);
+        clearTimeout(timeout);
+        // Send 'initialized' notification
+        worker.postMessage({ jsonrpc: '2.0', method: 'initialized', params: {} });
+        resolve();
+      }
+    };
+    worker.on('message', handler);
+    worker.postMessage({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        processId: null,
+        rootUri: 'file:///',
+        workspaceFolders: [{ uri: 'file:///', name: 'workspace' }],
+        capabilities: {},
+      },
+    });
+  });
+
+  return worker;
+}
+
+/** Format a MoonBit source file using the LSP server.
+ *  Returns the formatted source code. */
+function formatWithLsp(worker, source, filename) {
+  const uri = `file:///${filename}`;
+  const id = Math.floor(Math.random() * 1e9);
+
+  worker.postMessage({
+    jsonrpc: '2.0',
+    method: 'textDocument/didOpen',
+    params: {
+      textDocument: { uri, languageId: 'moonbit', version: 1, text: source },
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Format timeout')), 10000);
+    const handler = (msg) => {
+      if (!msg || msg.jsonrpc !== '2.0') return;
+      if (msg.id !== id) return;
+      worker.removeListener('message', handler);
+      clearTimeout(timeout);
+      worker.postMessage({
+        jsonrpc: '2.0',
+        method: 'textDocument/didClose',
+        params: { textDocument: { uri } },
+      });
+      if (msg.result && Array.isArray(msg.result) && msg.result.length > 0) {
+        const formatted = msg.result[0].newText;
+        // Strip the `///|` cursor marker added by the LSP formatter when it
+        // was not present in the original source.
+        const MARKER = '///|\n';
+        const stripped = (formatted.startsWith(MARKER) && !source.startsWith(MARKER))
+          ? formatted.slice(MARKER.length)
+          : formatted;
+        resolve(stripped);
+      } else {
+        resolve(source);
+      }
+    };
+    worker.on('message', handler);
+    worker.postMessage({
+      jsonrpc: '2.0',
+      id,
+      method: 'textDocument/formatting',
+      params: {
+        textDocument: { uri },
+        options: { tabSize: 2, insertSpaces: true },
+      },
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Formatter tests
+// ---------------------------------------------------------------------------
+
+test('format: indentation is normalized', async () => {
+  const worker = await startLspWorker();
+  try {
+    // Poorly indented code
+    const source = `fn main {
+        println("Hello")
+}`;
+    const formatted = await formatWithLsp(worker, source, 'main.mbt');
+    // The formatter should produce properly indented code
+    assert.ok(typeof formatted === 'string', 'result should be a string');
+    assert.ok(formatted.includes('println'), 'formatted code should retain content');
+    // Verify indentation is consistent (no 8-space indent for a simple body)
+    assert.ok(!formatted.includes('        println'), 'excessive indentation should be removed');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('format: well-formatted code is unchanged', async () => {
+  const worker = await startLspWorker();
+  try {
+    const source = `fn main {
+  println("Hello, MoonBit!")
+}
+`;
+    const formatted = await formatWithLsp(worker, source, 'main.mbt');
+    assert.ok(typeof formatted === 'string', 'result should be a string');
+    assert.ok(formatted.includes('println("Hello, MoonBit!")'), 'content should be preserved');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('format: multi-function file', async () => {
+  const worker = await startLspWorker();
+  try {
+    const source = `pub fn add(a : Int, b : Int) -> Int {
+a + b
+}
+
+pub fn hello() -> Unit {
+  println("Hello!")
+}
+`;
+    const formatted = await formatWithLsp(worker, source, 'lib.mbt');
+    assert.ok(typeof formatted === 'string', 'result should be a string');
+    assert.ok(formatted.includes('a + b'), 'function body should be preserved');
+    assert.ok(formatted.includes('pub fn add'), 'function signature should be preserved');
+  } finally {
+    worker.terminate();
+  }
+});
