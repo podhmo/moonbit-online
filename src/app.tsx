@@ -2,6 +2,8 @@ import { useState, useEffect } from 'preact/hooks';
 import { MoonbitCompiler } from './compiler';
 import { LineNumberEditor } from './LineNumberEditor';
 
+declare const __MOONPAD_VERSION__: string;
+
 const compiler = new MoonbitCompiler();
 
 const SAMPLE_CODES = {
@@ -166,7 +168,10 @@ export function App() {
   return (
     <main class="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>🌙 MoonBit Online</h1>
+        <div>
+          <h1 style={{ margin: 0 }}>🌙 MoonBit Online</h1>
+          <small style={{ color: 'var(--pico-muted-color)' }}>moonpad-monaco v{__MOONPAD_VERSION__}</small>
+        </div>
         <a 
           href="https://github.com/podhmo/moonbit-online" 
           target="_blank" 

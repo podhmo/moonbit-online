@@ -21,7 +21,7 @@ function getLoadPkgsParams(target = 'wasm-gc') {
     const base = pkg.split('/').at(-1)
     return [
       `/lib/core/${pkg}:${pkg}`,
-      coreMap[`/lib/core/target/${target}/release/bundle/${pkg}/${base}.mi`],
+      coreMap[`/lib/core/_build/${target}/release/bundle/${pkg}/${base}.mi`],
     ]
   })
 }

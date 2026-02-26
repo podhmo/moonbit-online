@@ -12,14 +12,19 @@ const outputPath = join(__dir, '../src/core/core-map.js');
 
 const content = readFileSync(monacoPath, 'utf-8');
 
-// Extract corePkgs (Bs array)
-const bsMatch = content.match(/Bs\s*=\s*(\["abort"[^\]]+\])/);
-if (!bsMatch) throw new Error('Could not find corePkgs (Bs) in moonpad-monaco.js');
-const corePkgs = JSON.parse(bsMatch[1]);
+// Extract corePkgs from all_pkgs.json embedded as Q()
+const allPkgsJsVarMatch = content.match(/X\["\/lib\/core\/_build\/js\/release\/bundle\/all_pkgs\.json"\]\s*=\s*([A-Za-z0-9_]+)/);
+if (!allPkgsJsVarMatch) throw new Error('Could not find all_pkgs.json var in moonpad-monaco.js');
+const allPkgsVarName = allPkgsJsVarMatch[1];
+const allPkgsVarRegex = new RegExp('\\b' + allPkgsVarName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*=\\s*Q\\("([^"]+)"\\)');
+const allPkgsVm = allPkgsVarRegex.exec(content);
+if (!allPkgsVm) throw new Error('Could not find all_pkgs.json data in moonpad-monaco.js');
+const allPkgsData = JSON.parse(Buffer.from(allPkgsVm[1], 'base64'));
+const corePkgs = allPkgsData.packages.map(p => p.rel);
 
-// Extract JS-target MI file entries: Y["/lib/core/target/js/..."] = varName
+// Extract JS-target MI file entries: X["/lib/core/_build/js/..."] = varName
 const miMap = {};
-const miRegex = /Y\["(\/lib\/core\/target\/js\/release\/bundle\/[^"]+\.mi)"\]\s*=\s*([A-Za-z0-9_]+)/g;
+const miRegex = /X\["(\/lib\/core\/_build\/js\/release\/bundle\/[^"]+\.mi)"\]\s*=\s*([A-Za-z0-9_]+)/g;
 let m;
 while ((m = miRegex.exec(content)) !== null) {
   const path = m[1];
@@ -32,7 +37,7 @@ while ((m = miRegex.exec(content)) !== null) {
 }
 
 // Extract core.core.gz (the bundled standard library)
-const coreGzMatch = content.match(/Y\["\/lib\/core\/target\/js\/release\/bundle\/core\.core\.gz"\]\s*=\s*([A-Za-z0-9_]+)/);
+const coreGzMatch = content.match(/X\["\/lib\/core\/_build\/js\/release\/bundle\/core\.core\.gz"\]\s*=\s*([A-Za-z0-9_]+)/);
 if (!coreGzMatch) throw new Error('Could not find core.core.gz in moonpad-monaco.js');
 const coreGzVarName = coreGzMatch[1];
 const coreGzVarRegex = new RegExp('\\b' + coreGzVarName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*=\\s*Q\\("([^"]+)"\\)');

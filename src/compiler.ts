@@ -61,6 +61,7 @@ export class MoonbitCompiler {
       const buildResult = await callWorker('buildPackage', {
         mbtFiles: files,
         miFiles: [],
+        indirectImportMiFiles: [],
         stdMiFiles,
         target: 'js',
         pkg: 'moonpad/lib',
