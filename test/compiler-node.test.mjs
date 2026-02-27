@@ -350,6 +350,7 @@ test('compile and run nested package dependencies (main -> a -> b)', async () =>
     });
     assert.deepEqual(mainResult.diagnostics, [], 'main package compiles with package a import');
 
+    // Keep dependency order explicit: b (leaf) -> a -> main.
     const linkResult = await callWorker(worker, 'linkCore', {
       coreFiles: [CORE_FILE, bResult.core, aResult.core, mainResult.core],
       main: 'moonpad/main',
