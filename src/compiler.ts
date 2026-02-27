@@ -174,7 +174,7 @@ export class MoonbitCompiler {
         const packageFiles = new Map<string, Array<[string, string]>>();
         for (const [name, content] of files) {
           if (name.includes('/')) {
-            const [pkg] = name.split('/', 1);
+            const pkg = name.split('/')[0];
             if (!packageFiles.has(pkg)) packageFiles.set(pkg, []);
             packageFiles.get(pkg)!.push([name, content]);
           } else {
@@ -193,6 +193,7 @@ export class MoonbitCompiler {
         for (const [pkg, pkgFiles] of packageFiles.entries()) {
           const deps = new Set<string>();
           for (const [, content] of pkgFiles) {
+            // Heuristic only: detect user package refs by `@pkg.` usage in source text.
             for (const match of content.matchAll(/@([A-Za-z0-9_]+)\./g)) {
               const dep = match[1];
               if (dep !== pkg && packageFiles.has(dep)) deps.add(dep);
