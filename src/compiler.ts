@@ -218,7 +218,12 @@ export class MoonbitCompiler {
         for (const pkg of packageNames) visit(pkg);
 
         const pkgSources = packageNames.map((pkg) => `moonpad/${pkg}:moonpad:/${pkg}/`);
-        const mainPkg = packageFiles.has('main') ? 'main' : packageNames[0];
+        const packageWithMainFile = packageNames.find((pkg) =>
+          (packageFiles.get(pkg) ?? []).some(([filename]) => filename.endsWith('/main.mbt'))
+        );
+        const mainPkg = packageFiles.has('main')
+          ? 'main'
+          : (packageWithMainFile ?? [...packageNames].sort((a, b) => a.localeCompare(b))[0]);
         const pkgArtifacts = new Map<string, { mi: Uint8Array; core: Uint8Array }>();
         const allWarnings: string[] = [];
 
