@@ -239,6 +239,63 @@ test('compile and run multiple files', async () => {
   }
 });
 
+test('compile and run multiple packages (user-defined)', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const pkgSources = ['moonpad/main:moonpad:/main/', 'moonpad/dep:moonpad:/dep/'];
+    const depResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['dep/lib.mbt', 'pub fn add(a : Int, b : Int) -> Int {\n  a + b\n}']],
+      miFiles: [],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/dep',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(depResult.diagnostics, [], 'dependency package compiles');
+
+    const mainResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['main/main.mbt', 'fn main {\n  println(@dep.add(3, 4))\n}']],
+      miFiles: [['moonpad/dep.mi', depResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/main',
+      pkgSources,
+      isMain: true,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(mainResult.diagnostics, [], 'main package compiles with local package import');
+
+    const linkResult = await callWorker(worker, 'linkCore', {
+      coreFiles: [CORE_FILE, depResult.core, mainResult.core],
+      main: 'moonpad/main',
+      pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+      target: 'js',
+      exportedFunctions: [],
+      outputFormat: 'wasm',
+      testMode: false,
+      debug: false,
+      stopOnMain: false,
+      noOpt: false,
+      sourceMap: false,
+      sourceMapUrl: '',
+      sources: {},
+    });
+
+    const output = runCompiledJs(linkResult.result);
+    assert.equal(output.trim(), '7');
+  } finally {
+    worker.terminate();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Test mode helpers
 // ---------------------------------------------------------------------------
