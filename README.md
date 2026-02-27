@@ -100,7 +100,7 @@ pub fn sum(arr : Array[Int]) -> Int {
 
 ### パッケージimport
 
-`@moonbitlang/core`の標準ライブラリパッケージを使用できます：
+[`@moonbitlang/core`](https://github.com/moonbitlang/core)の標準ライブラリパッケージを使用できます：
 
 ```moonbit
 fn main {
