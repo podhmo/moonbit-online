@@ -59,10 +59,41 @@ function parseMultipleFiles(source: string): Array<[string, string]> {
   return files;
 }
 
-function loadCodeFromHash(): string {
+const COMPRESSED_PREFIX = 'z:';
+
+async function compressToBase64Url(text: string): Promise<string> {
+  const stream = new Blob([new TextEncoder().encode(text)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  const buffer = await new Response(stream).arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function decompressFromBase64Url(encoded: string): Promise<string> {
+  let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  const buffer = await new Response(stream).arrayBuffer();
+  return new TextDecoder().decode(buffer);
+}
+
+async function loadCodeFromHashAsync(): Promise<string> {
   const hash = window.location.hash.slice(1);
   if (!hash) return DEFAULT_CODE;
-  
+  try {
+    if (hash.startsWith(COMPRESSED_PREFIX)) {
+      return await decompressFromBase64Url(hash.slice(COMPRESSED_PREFIX.length));
+    }
+    return decodeURIComponent(atob(hash));
+  } catch (e) {
+    console.error('Failed to decode hash:', e);
+    return DEFAULT_CODE;
+  }
+}
+
+function loadCodeFromHashSync(): string {
+  const hash = window.location.hash.slice(1);
+  if (!hash || hash.startsWith(COMPRESSED_PREFIX)) return DEFAULT_CODE;
   try {
     return decodeURIComponent(atob(hash));
   } catch (e) {
@@ -72,7 +103,7 @@ function loadCodeFromHash(): string {
 }
 
 export function App() {
-  const [code, setCode] = useState(loadCodeFromHash());
+  const [code, setCode] = useState(loadCodeFromHashSync());
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -81,11 +112,15 @@ export function App() {
   const [warningOutput, setWarningOutput] = useState('');
   const [selectedSample, setSelectedSample] = useState<string>(Object.keys(SAMPLE_CODES)[0]);
 
-  // Load code from URL hash on mount
+  // Load code from URL hash on mount (handles compressed hashes asynchronously)
+  useEffect(() => {
+    loadCodeFromHashAsync().then(setCode);
+  }, []);
+
+  // Listen for hash changes
   useEffect(() => {
     const handleHashChange = () => {
-      const newCode = loadCodeFromHash();
-      setCode(newCode);
+      loadCodeFromHashAsync().then(setCode);
     };
     
     window.addEventListener('hashchange', handleHashChange);
@@ -163,9 +198,9 @@ export function App() {
     }
   };
 
-  const handleShare = () => {
-    const encoded = btoa(encodeURIComponent(code));
-    const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
+  const handleShare = async () => {
+    const encoded = await compressToBase64Url(code);
+    const url = `${window.location.origin}${window.location.pathname}#${COMPRESSED_PREFIX}${encoded}`;
     navigator.clipboard.writeText(url).then(() => {
       alert('Link copied to clipboard!');
     });
