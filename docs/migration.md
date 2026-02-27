@@ -109,6 +109,7 @@ npm test
 **注意**: `moonpad-monaco.js` はブラウザには配信されていません（`postinstall` 時のデータ抽出にのみ使用）。ブラウザに配信されているのは：
 - `moonc-worker.js` (コンパイラ本体、~4 MB)
 - `src/core/core-map.js` (生成された stdlib データ、インライン Base64)
+- https://github.com/moonbitlang/core
 
 つまり **不要な Monaco/LSP 関連コードはすでにブラウザには送られていない**状態です。
 
