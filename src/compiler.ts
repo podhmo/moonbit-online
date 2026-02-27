@@ -174,7 +174,14 @@ export class MoonbitCompiler {
         const packageFiles = new Map<string, Array<[string, string]>>();
         for (const [name, content] of files) {
           if (name.includes('/')) {
-            const pkg = name.split('/')[0];
+            const parts = name.split('/');
+            if (parts.length !== 2 || !parts[0] || !parts[1]) {
+              return {
+                success: false,
+                error: `Only single-level package paths are supported: "pkg/file.mbt" (got "${name}")`
+              };
+            }
+            const pkg = parts[0];
             if (!packageFiles.has(pkg)) packageFiles.set(pkg, []);
             packageFiles.get(pkg)!.push([name, content]);
           } else {

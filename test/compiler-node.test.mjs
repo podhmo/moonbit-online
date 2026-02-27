@@ -837,6 +837,12 @@ function packageOf(filename) {
 
 function normalizeFileEntry(filename, content) {
   const pkg = packageOf(filename);
+  if (filename.includes('/')) {
+    const parts = filename.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new Error(`Only single-level package paths are supported: "pkg/file.mbt" (got "${filename}")`);
+    }
+  }
   return [pkg, filename.includes('/') ? filename : `${pkg}/${filename}`, content];
 }
 
@@ -936,6 +942,13 @@ async function compileAndLinkMultiplePackages(worker, files) {
 
   return linkResult.result;
 }
+
+test('multi-package helper rejects nested directory paths', () => {
+  assert.throws(
+    () => normalizeFileEntry('dep/nested/math.mbt', 'pub fn plus(a : Int, b : Int) -> Int { a + b }'),
+    /Only single-level package paths are supported/
+  );
+});
 
 const samplesDir = join(__dir, '../src/sample_codes');
 const sampleFiles = readdirSync(samplesDir).filter(f => f.endsWith('.mbt')).sort();
