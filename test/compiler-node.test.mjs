@@ -296,6 +296,83 @@ test('compile and run multiple packages (user-defined)', async () => {
   }
 });
 
+test('compile and run nested package dependencies (main -> a -> b)', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const pkgSources = [
+      'moonpad/main:moonpad:/main/',
+      'moonpad/a:moonpad:/a/',
+      'moonpad/b:moonpad:/b/',
+    ];
+
+    const bResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['b/lib.mbt', 'pub fn inc(x : Int) -> Int {\n  x + 1\n}']],
+      miFiles: [],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/b',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(bResult.diagnostics, [], 'package b compiles');
+
+    const aResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['a/lib.mbt', 'pub fn twice_from_b(x : Int) -> Int {\n  @b.inc(@b.inc(x))\n}']],
+      miFiles: [['moonpad/b.mi', bResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/a',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(aResult.diagnostics, [], 'package a compiles with package b import');
+
+    const mainResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['main/main.mbt', 'fn main {\n  println(@a.twice_from_b(5))\n}']],
+      miFiles: [['moonpad/a.mi', aResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/main',
+      pkgSources,
+      isMain: true,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(mainResult.diagnostics, [], 'main package compiles with package a import');
+
+    const linkResult = await callWorker(worker, 'linkCore', {
+      coreFiles: [CORE_FILE, bResult.core, aResult.core, mainResult.core],
+      main: 'moonpad/main',
+      pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+      target: 'js',
+      exportedFunctions: [],
+      outputFormat: 'wasm',
+      testMode: false,
+      debug: false,
+      stopOnMain: false,
+      noOpt: false,
+      sourceMap: false,
+      sourceMapUrl: '',
+      sources: {},
+    });
+
+    const output = runCompiledJs(linkResult.result);
+    assert.equal(output.trim(), '7');
+  } finally {
+    worker.terminate();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Test mode helpers
 // ---------------------------------------------------------------------------
