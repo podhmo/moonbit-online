@@ -239,6 +239,141 @@ test('compile and run multiple files', async () => {
   }
 });
 
+test('compile and run multiple packages (user-defined)', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const pkgSources = ['moonpad/main:moonpad:/main/', 'moonpad/dep:moonpad:/dep/'];
+    const depResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['dep/lib.mbt', 'pub fn add(a : Int, b : Int) -> Int {\n  a + b\n}']],
+      miFiles: [],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/dep',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(depResult.diagnostics, [], 'dependency package compiles');
+
+    const mainResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['main/main.mbt', 'fn main {\n  println(@dep.add(3, 4))\n}']],
+      miFiles: [['moonpad/dep.mi', depResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/main',
+      pkgSources,
+      isMain: true,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(mainResult.diagnostics, [], 'main package compiles with local package import');
+
+    const linkResult = await callWorker(worker, 'linkCore', {
+      coreFiles: [CORE_FILE, depResult.core, mainResult.core],
+      main: 'moonpad/main',
+      pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+      target: 'js',
+      exportedFunctions: [],
+      outputFormat: 'wasm',
+      testMode: false,
+      debug: false,
+      stopOnMain: false,
+      noOpt: false,
+      sourceMap: false,
+      sourceMapUrl: '',
+      sources: {},
+    });
+
+    const output = runCompiledJs(linkResult.result);
+    assert.equal(output.trim(), '7');
+  } finally {
+    worker.terminate();
+  }
+});
+
+test('compile and run nested package dependencies (main -> a -> b)', async () => {
+  const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
+  try {
+    const pkgSources = [
+      'moonpad/main:moonpad:/main/',
+      'moonpad/a:moonpad:/a/',
+      'moonpad/b:moonpad:/b/',
+    ];
+
+    const bResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['b/lib.mbt', 'pub fn inc(x : Int) -> Int {\n  x + 1\n}']],
+      miFiles: [],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/b',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(bResult.diagnostics, [], 'package b compiles');
+
+    const aResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['a/lib.mbt', 'pub fn twice_from_b(x : Int) -> Int {\n  @b.inc(@b.inc(x))\n}']],
+      miFiles: [['moonpad/b.mi', bResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/a',
+      pkgSources,
+      isMain: false,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(aResult.diagnostics, [], 'package a compiles with package b import');
+
+    const mainResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: [['main/main.mbt', 'fn main {\n  println(@a.twice_from_b(5))\n}']],
+      miFiles: [['moonpad/a.mi', aResult.mi]],
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: 'moonpad/main',
+      pkgSources,
+      isMain: true,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    assert.deepEqual(mainResult.diagnostics, [], 'main package compiles with package a import');
+
+    // Keep dependency order explicit: b (leaf) -> a -> main.
+    const linkResult = await callWorker(worker, 'linkCore', {
+      coreFiles: [CORE_FILE, bResult.core, aResult.core, mainResult.core],
+      main: 'moonpad/main',
+      pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+      target: 'js',
+      exportedFunctions: [],
+      outputFormat: 'wasm',
+      testMode: false,
+      debug: false,
+      stopOnMain: false,
+      noOpt: false,
+      sourceMap: false,
+      sourceMapUrl: '',
+      sources: {},
+    });
+
+    const output = runCompiledJs(linkResult.result);
+    assert.equal(output.trim(), '7');
+  } finally {
+    worker.terminate();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Test mode helpers
 // ---------------------------------------------------------------------------
@@ -696,6 +831,125 @@ function parseSampleFiles(source) {
   return files;
 }
 
+function packageOf(filename) {
+  return filename.includes('/') ? filename.split('/')[0] : 'main';
+}
+
+function normalizeFileEntry(filename, content) {
+  const pkg = packageOf(filename);
+  if (filename.includes('/')) {
+    const parts = filename.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new Error(`Only single-level package paths are supported: "pkg/file.mbt" (got "${filename}")`);
+    }
+  }
+  return [pkg, filename.includes('/') ? filename : `${pkg}/${filename}`, content];
+}
+
+function hasMultiplePackages(files) {
+  return new Set(files.map(([filename]) => packageOf(filename))).size > 1;
+}
+
+const PACKAGE_REFERENCE_PATTERN = /@([A-Za-z0-9_]+)\./g;
+
+async function compileAndLinkMultiplePackages(worker, files) {
+  const packageFiles = new Map();
+  for (const [filename, content] of files) {
+    const [pkg, normalizedFilename, normalizedContent] = normalizeFileEntry(filename, content);
+    if (!packageFiles.has(pkg)) packageFiles.set(pkg, []);
+    packageFiles.get(pkg).push([normalizedFilename, normalizedContent]);
+  }
+
+  const packageNames = [...packageFiles.keys()];
+  const depGraph = new Map();
+  for (const [pkg, pkgFiles] of packageFiles.entries()) {
+    const deps = new Set();
+    for (const [, content] of pkgFiles) {
+      for (const match of content.matchAll(PACKAGE_REFERENCE_PATTERN)) {
+        const dep = match[1];
+        if (dep !== pkg && packageFiles.has(dep)) deps.add(dep);
+      }
+    }
+    depGraph.set(pkg, deps);
+  }
+
+  const orderedPkgs = [];
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (pkg) => {
+    if (visited.has(pkg)) return;
+    if (visiting.has(pkg)) throw new Error(`Cyclic package dependency detected around "${pkg}"`);
+    visiting.add(pkg);
+    for (const dep of depGraph.get(pkg) ?? []) visit(dep);
+    visiting.delete(pkg);
+    visited.add(pkg);
+    orderedPkgs.push(pkg);
+  };
+  for (const pkg of packageNames) visit(pkg);
+
+  const packageWithMainFile = packageNames.find((pkg) =>
+    (packageFiles.get(pkg) ?? []).some(([filename]) => filename.endsWith('/main.mbt'))
+  );
+  const mainPkg = packageFiles.has('main')
+    ? 'main'
+    : (packageWithMainFile ?? [...packageNames].sort((a, b) => a.localeCompare(b))[0]);
+  const pkgSources = packageNames.map((pkg) => `moonpad/${pkg}:moonpad:/${pkg}/`);
+  const pkgArtifacts = new Map();
+
+  for (const pkg of orderedPkgs) {
+    const depMiFiles = [];
+    for (const dep of depGraph.get(pkg) ?? []) {
+      const depArtifact = pkgArtifacts.get(dep);
+      if (depArtifact) depMiFiles.push([`moonpad/${dep}.mi`, depArtifact.mi]);
+    }
+    const buildResult = await callWorker(worker, 'buildPackage', {
+      mbtFiles: packageFiles.get(pkg),
+      miFiles: depMiFiles,
+      indirectImportMiFiles: [],
+      stdMiFiles: STD_MI_FILES,
+      target: 'js',
+      pkg: `moonpad/${pkg}`,
+      pkgSources,
+      isMain: pkg === mainPkg,
+      noOpt: false,
+      enableValueTracing: false,
+      errorFormat: 'json',
+    });
+    // Treat malformed diagnostics as errors.
+    const errors = (buildResult.diagnostics ?? []).filter((d) => {
+      try { return JSON.parse(d).level !== 'warning'; } catch { return true; }
+    });
+    assert.deepEqual(errors, [], `${pkg}: no compilation errors`);
+    pkgArtifacts.set(pkg, { core: buildResult.core, mi: buildResult.mi });
+  }
+
+  const linkResult = await callWorker(worker, 'linkCore', {
+    // orderedPkgs is topological order (dependencies before dependents, including main).
+    coreFiles: [CORE_FILE, ...orderedPkgs.map((pkg) => pkgArtifacts.get(pkg).core)],
+    main: `moonpad/${mainPkg}`,
+    pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+    target: 'js',
+    exportedFunctions: [],
+    outputFormat: 'wasm',
+    testMode: false,
+    debug: false,
+    stopOnMain: false,
+    noOpt: false,
+    sourceMap: false,
+    sourceMapUrl: '',
+    sources: {},
+  });
+
+  return linkResult.result;
+}
+
+test('multi-package helper rejects nested directory paths', () => {
+  assert.throws(
+    () => normalizeFileEntry('dep/nested/math.mbt', 'pub fn plus(a : Int, b : Int) -> Int { a + b }'),
+    /Only single-level package paths are supported/
+  );
+});
+
 const samplesDir = join(__dir, '../src/sample_codes');
 const sampleFiles = readdirSync(samplesDir).filter(f => f.endsWith('.mbt')).sort();
 
@@ -715,6 +969,7 @@ const EXPECTED_OUTPUTS = {
   'Multiple Files': 'Hello from lib.mbt!',
   'With Package Import': "Value of 'b': 2",
   'Comprehensive Demo': '=== MoonBit Feature Showcase ===',
+  'User Defined Multi Package': '13',
 };
 
 /**
@@ -739,14 +994,19 @@ for (const sampleFile of sampleFiles) {
   test(`sample: ${displayName} — compiles without errors`, async () => {
     const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
     try {
-      const buildResult = testOnly
-        ? await buildTestPackage(worker, mbtFiles)
-        : await buildPackage(worker, mbtFiles);
-      // Filter out warning-level diagnostics; only fail on errors
-      const errors = buildResult.diagnostics.filter(d => {
-        try { return JSON.parse(d).level === 'error'; } catch { return true; }
-      });
-      assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
+      if (hasMultiplePackages(mbtFiles)) {
+        const jsBytes = await compileAndLinkMultiplePackages(worker, mbtFiles);
+        assert.ok(jsBytes.length > 0, `${displayName}: linked JS should be generated`);
+      } else {
+        const buildResult = testOnly
+          ? await buildTestPackage(worker, mbtFiles)
+          : await buildPackage(worker, mbtFiles);
+        // Filter out warning-level diagnostics; only fail on errors
+        const errors = buildResult.diagnostics.filter(d => {
+          try { return JSON.parse(d).level === 'error'; } catch { return true; }
+        });
+        assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
+      }
     } finally {
       worker.terminate();
     }
@@ -755,17 +1015,23 @@ for (const sampleFile of sampleFiles) {
   test(`sample: ${displayName} — runs and produces expected output`, async () => {
     const worker = new Worker(join(__dir, 'worker-bootstrap.cjs'));
     try {
-      const buildResult = testOnly
-        ? await buildTestPackage(worker, mbtFiles)
-        : await buildPackage(worker, mbtFiles);
-      const errors = buildResult.diagnostics.filter(d => {
-        try { return JSON.parse(d).level === 'error'; } catch { return true; }
-      });
-      assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
-      const linkResult = testOnly
-        ? await linkTestCore(worker, buildResult.core)
-        : await linkCore(worker, buildResult.core);
-      const output = runCompiledJs(linkResult.result);
+      let output;
+      if (hasMultiplePackages(mbtFiles)) {
+        const jsBytes = await compileAndLinkMultiplePackages(worker, mbtFiles);
+        output = runCompiledJs(jsBytes);
+      } else {
+        const buildResult = testOnly
+          ? await buildTestPackage(worker, mbtFiles)
+          : await buildPackage(worker, mbtFiles);
+        const errors = buildResult.diagnostics.filter(d => {
+          try { return JSON.parse(d).level === 'error'; } catch { return true; }
+        });
+        assert.deepEqual(errors, [], `${displayName}: no compilation errors`);
+        const linkResult = testOnly
+          ? await linkTestCore(worker, buildResult.core)
+          : await linkCore(worker, buildResult.core);
+        output = runCompiledJs(linkResult.result);
+      }
       const expected = EXPECTED_OUTPUTS[displayName];
       if (expected) {
         assert.ok(output.includes(expected), `${displayName}: output should contain "${expected}"`);

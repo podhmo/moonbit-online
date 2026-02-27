@@ -168,6 +168,162 @@ export class MoonbitCompiler {
     try {
       resetWorker();
       const stdMiFiles = getLoadPkgsParams('js').filter(([, data]) => data != null);
+      const hasPackagePaths = files.some(([name]) => name.includes('/'));
+
+      if (hasPackagePaths) {
+        const packageFiles = new Map<string, Array<[string, string]>>();
+        for (const [name, content] of files) {
+          if (name.includes('/')) {
+            const parts = name.split('/');
+            if (parts.length !== 2 || !parts[0] || !parts[1]) {
+              return {
+                success: false,
+                error: `Only single-level package paths are supported: "pkg/file.mbt" (got "${name}")`
+              };
+            }
+            const pkg = parts[0];
+            if (!packageFiles.has(pkg)) packageFiles.set(pkg, []);
+            packageFiles.get(pkg)!.push([name, content]);
+          } else {
+            const fallbackPkg = 'main';
+            if (!packageFiles.has(fallbackPkg)) packageFiles.set(fallbackPkg, []);
+            packageFiles.get(fallbackPkg)!.push([`${fallbackPkg}/${name}`, content]);
+          }
+        }
+
+        const packageNames = [...packageFiles.keys()];
+        if (packageNames.length === 0) {
+          return { success: false, error: 'No files provided' };
+        }
+
+        const depGraph = new Map<string, Set<string>>();
+        for (const [pkg, pkgFiles] of packageFiles.entries()) {
+          const deps = new Set<string>();
+          for (const [, content] of pkgFiles) {
+            // Heuristic only: detect user package refs by `@pkg.` usage in source text.
+            for (const match of content.matchAll(/@([A-Za-z0-9_]+)\./g)) {
+              const dep = match[1];
+              if (dep !== pkg && packageFiles.has(dep)) deps.add(dep);
+            }
+          }
+          depGraph.set(pkg, deps);
+        }
+
+        const orderedPkgs: string[] = [];
+        const visiting = new Set<string>();
+        const visited = new Set<string>();
+        const visit = (pkg: string) => {
+          if (visited.has(pkg)) return;
+          if (visiting.has(pkg)) {
+            throw new Error(`Cyclic package dependency detected around "${pkg}"`);
+          }
+          visiting.add(pkg);
+          for (const dep of depGraph.get(pkg) ?? []) visit(dep);
+          visiting.delete(pkg);
+          visited.add(pkg);
+          orderedPkgs.push(pkg);
+        };
+        for (const pkg of packageNames) visit(pkg);
+
+        const pkgSources = packageNames.map((pkg) => `moonpad/${pkg}:moonpad:/${pkg}/`);
+        const packageWithMainFile = packageNames.find((pkg) =>
+          (packageFiles.get(pkg) ?? []).some(([filename]) => filename.endsWith('/main.mbt'))
+        );
+        const mainPkg = packageFiles.has('main')
+          ? 'main'
+          : (packageWithMainFile ?? [...packageNames].sort((a, b) => a.localeCompare(b))[0]);
+        const pkgArtifacts = new Map<string, { mi: Uint8Array; core: Uint8Array }>();
+        const allWarnings: string[] = [];
+
+        for (const pkg of orderedPkgs) {
+          const depMiFiles: Array<[string, Uint8Array]> = [];
+          for (const dep of depGraph.get(pkg) ?? []) {
+            const depArtifact = pkgArtifacts.get(dep);
+            if (depArtifact) depMiFiles.push([`moonpad/${dep}.mi`, depArtifact.mi]);
+          }
+
+          const buildResult = await callWorker('buildPackage', {
+            mbtFiles: packageFiles.get(pkg)!,
+            miFiles: depMiFiles,
+            indirectImportMiFiles: [],
+            stdMiFiles,
+            target: 'js',
+            pkg: `moonpad/${pkg}`,
+            pkgSources,
+            isMain: pkg === mainPkg,
+            noOpt: false,
+            enableValueTracing: false,
+            errorFormat: 'json'
+          });
+
+          const diagnostics = Array.isArray(buildResult.diagnostics) ? buildResult.diagnostics : [];
+          const parsedDiagnostics = diagnostics
+            .map((d: string | { level?: string; loc?: any; message?: string }) => {
+              if (typeof d === 'string') {
+                try {
+                  return JSON.parse(d);
+                } catch {
+                  return { level: 'error', message: d };
+                }
+              }
+              return d;
+            });
+          const errorsOnly = parsedDiagnostics.filter((d: { level?: string }) => d.level !== 'warning');
+          const warnings = parsedDiagnostics
+            .filter((d: { level?: string }) => d.level === 'warning')
+            .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
+              const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
+              return `${loc ? `${loc} - ` : ''}${d.message ?? 'Warning'}`;
+            });
+          allWarnings.push(...warnings);
+
+          if (errorsOnly.length > 0 || !buildResult.core || !buildResult.mi) {
+            const errors = errorsOnly
+              .map((d: { loc?: { path?: string; start?: { line?: number; col?: number } }; message?: string }) => {
+                const loc = d.loc?.path && d.loc?.start ? `${d.loc.path}:${d.loc.start.line}:${d.loc.start.col}` : '';
+                return `${loc ? `${loc} - ` : ''}${d.message ?? 'Compilation failed'}`;
+              })
+              .join('\n');
+            return {
+              success: false,
+              error: errors || `Compilation failed in package "${pkg}": no package core/mi output`
+            };
+          }
+
+          pkgArtifacts.set(pkg, { mi: buildResult.mi, core: buildResult.core });
+        }
+
+        const linkCoreFiles: Uint8Array[] = [coreCore, ...orderedPkgs.map((pkg) => pkgArtifacts.get(pkg)!.core)];
+        const linkResult = await callWorker('linkCore', {
+          coreFiles: linkCoreFiles,
+          main: `moonpad/${mainPkg}`,
+          pkgSources: ['moonbitlang/core:moonbit-core:/lib/core', ...pkgSources],
+          target: 'js',
+          exportedFunctions: [],
+          outputFormat: 'wasm',
+          testMode: false,
+          debug: false,
+          stopOnMain: false,
+          noOpt: false,
+          sourceMap: false,
+          sourceMapUrl: '',
+          sources: {}
+        });
+
+        if (!linkResult.result) {
+          return {
+            success: false,
+            error: 'Compilation succeeded but no JS output received'
+          };
+        }
+
+        return {
+          success: true,
+          js: linkResult.result,
+          warnings: allWarnings
+        };
+      }
+
       const buildResult = await callWorker('buildPackage', {
         mbtFiles: files,
         miFiles: [],
@@ -253,6 +409,12 @@ export class MoonbitCompiler {
 
   async compileTest(files: Array<[string, string]>): Promise<CompileResult> {
     try {
+      if (files.some(([name]) => name.includes('/'))) {
+        return {
+          success: false,
+          error: 'Test mode does not support multiple packages yet'
+        };
+      }
       resetWorker();
       const stdMiFiles = getLoadPkgsParams('js').filter(([, data]: [string, unknown]) => data != null);
 
