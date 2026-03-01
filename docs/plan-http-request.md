@@ -1,4 +1,4 @@
-# HTTP requestサンプル導入の調査メモ
+# HTTP Requestサンプル導入の調査メモ
 
 ## 結論
 

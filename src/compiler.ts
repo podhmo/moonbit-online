@@ -552,7 +552,12 @@ self.console = {
 };
 ${code}
 Promise.resolve(self[${JSON.stringify(RUN_WAIT_PROMISE_KEY)}])
-  .catch((error) => self.postMessage({ __moonbit_warn__: String(error) }))
+  .catch((error) => {
+    const details = error && typeof error === 'object'
+      ? [error.message, error.stack].filter(Boolean).join('\\n')
+      : String(error);
+    self.postMessage({ __moonbit_warn__: details || String(error) });
+  })
   .finally(() => self.postMessage({ __moonbit_done__: true }));
 `;
       const blobUrl = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
