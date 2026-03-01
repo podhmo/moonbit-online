@@ -28,3 +28,10 @@
 4. `@http.get` を使ったサンプルとテストを追加し、ブラウザ/Nodeの両方で確認する。
 
 現時点では 1,2 の配布資産が不足しているため、先に「JS fetchを使う実行可能サンプル」を追加した。
+
+## 進捗
+
+一応進捗はあるみたい
+
+- https://github.com/moonbitlang/async/pull/302
+- https://mooncakes.io/docs/moonbitlang/async/js_async
