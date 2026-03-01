@@ -46,6 +46,7 @@ npm run build
 - **Hello**: シンプルな単一ファイルの例
 - **Multiple Files**: 同一パッケージ内の複数ファイル
 - **With Package Import**: 標準ライブラリ（@hashmap）の使用例
+- **Http Request With Fetch**: JavaScriptバックエンドの`fetch`呼び出し例
 
 ### 単一ファイル
 

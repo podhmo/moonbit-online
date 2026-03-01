@@ -970,6 +970,7 @@ const EXPECTED_OUTPUTS = {
   'With Package Import': "Value of 'b': 2",
   'Comprehensive Demo': '=== MoonBit Feature Showcase ===',
   'User Defined Multi Package': '13',
+  'Http Request With Fetch': 'fetch body: hello-from-fetch',
 };
 
 /**
