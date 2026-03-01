@@ -1,3 +1,6 @@
+// https://github.com/moonbitlang/async で実装が進められてるがまだwasm側に降りてきてない。
+// 仕方がないのでjsのffiを使った例でお茶を濁しておく。
+
 extern "js" fn fetch_demo(on_done : (String) -> Unit) -> Unit =
   #| (on_done) => {
   #|   globalThis.__moonbit_run_wait_promise__ = fetch("data:text/plain,hello-from-fetch")
