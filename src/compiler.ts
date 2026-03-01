@@ -112,6 +112,7 @@ fn main {
 }`;
 
 let worker: Worker | null = null;
+const RUN_WAIT_PROMISE_KEY = '__moonbit_run_wait_promise__';
 
 function resetWorker() {
   if (worker) {
@@ -550,7 +551,9 @@ self.console = {
   warn: (...args) => self.postMessage({ __moonbit_warn__: args.map((x) => String(x)).join(' ') })
 };
 ${code}
-self.postMessage({ __moonbit_done__: true });
+Promise.resolve(self[${JSON.stringify(RUN_WAIT_PROMISE_KEY)}])
+  .catch((error) => self.postMessage({ __moonbit_warn__: String(error) }))
+  .finally(() => self.postMessage({ __moonbit_done__: true }));
 `;
       const blobUrl = URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }));
       const jsWorker = new Worker(blobUrl, { type: 'module' });
