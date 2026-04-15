@@ -1,6 +1,13 @@
 # Migration Guide: `@moonbit/moonpad-monaco` バージョンアップ手順
 
-このドキュメントは `@moonbit/moonpad-monaco` のバージョンアップ作業（`0.1.202510171` → `0.1.202602253`）で得た知識をまとめ、次回以降の作業者が同じ落とし穴にはまらないようにするためのものです。
+このドキュメントは `@moonbit/moonpad-monaco` のバージョンアップ作業で得た知識をまとめ、次回以降の作業者が同じ落とし穴にはまらないようにするためのものです。
+
+### バージョンアップ履歴
+
+| 移行 | 変更規模 | 備考 |
+|---|---|---|
+| `0.1.202510171` → `0.1.202602253` | 大 | MI パス変更、API パラメータ追加、`generate-core-map.mjs` 全面改修 |
+| `0.1.202602253` → `0.1.202602254` | 小 | API 変更なし。MI ファイル数が 66 → 64 に減少（stdlib 再編による） |
 
 ---
 
@@ -15,7 +22,7 @@
 | `@moonbit/analyzer` | ~数 MB | LSP サーバー (`lsp-server.js`) |
 
 `moonpad-monaco.js` に内包されているデータ：
-- **MI ファイル**: JS ターゲット用 stdlib インターフェースファイル（バージョン `0.1.202602253` では66個）
+- **MI ファイル**: JS ターゲット用 stdlib インターフェースファイル（バージョン `0.1.202602254` では64個）
 - **ソースファイル**: stdlib の `.mbt` ソース（502個、LSP 用）
 - **`core.core.gz`**: pre-linked stdlib バイナリ（`linkCore` に渡す）
 - **`all_pkgs.json`**: stdlib パッケージ一覧（Base64 JSON）
@@ -31,7 +38,7 @@
 ### 1. `package.json` のバージョンを更新
 
 ```json
-"@moonbit/moonpad-monaco": "0.1.202602253"
+"@moonbit/moonpad-monaco": "0.1.202602254"
 ```
 
 ### 2. `npm install` を実行
@@ -132,3 +139,22 @@ npm test
 | `vite.config.ts` | ビルド時バージョン定数 `__MOONPAD_VERSION__` を注入 |
 | `src/app.tsx` | タイトル下にバージョン表示を追加 |
 | `src/core/core-map.js` | `npm install` (`generate-core-map.mjs`) により自動生成 |
+
+---
+
+## `0.1.202602253` → `0.1.202602254` の移行メモ
+
+### 変更点
+
+- **API 変更なし**: `buildPackage` / `linkCore` / `genTestInfo` のパラメータ・型定義に変更はありませんでした。`generate-core-map.mjs` の正規表現も変更不要でした。
+- **MI ファイル数の減少**: stdlib の MI ファイルが 66 → 64 に減少。stdlib 内部パッケージの再編成によるものと推測されます。コード側の対応は不要です。
+- **スムーズな移行**: `package.json` のバージョン番号を書き換えて `npm install` を実行するだけで完了しました。
+
+### 変更ファイル一覧（`0.1.202602253` → `0.1.202602254`）
+
+| ファイル | 変更理由 |
+|---|---|
+| `package.json` | バージョン更新 |
+| `package-lock.json` | `npm install` による自動更新 |
+| `src/core/core-map.js` | `npm install` (`generate-core-map.mjs`) により自動生成 |
+| `docs/migration.md` | 移行メモの追記 |
